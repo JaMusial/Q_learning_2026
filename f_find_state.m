@@ -4,7 +4,7 @@ function stan = f_find_state(e, table)
 %
 % Returns integer stan in 1:(numel(table)+1).
 
-if 0
+if 1
     n = numel(table);
     if n == 0
         stan = 1;

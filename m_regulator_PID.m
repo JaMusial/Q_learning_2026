@@ -80,7 +80,7 @@ else
     u_obiekt_PID = u_PID;
 end
 for petla_wew_obiekt=1:iteracje_petla_wew
-    [y_PID,y1_n_PID,y2_n_PID,y3_n_PID,bufor_PID]=f_obiekt(nr_modelu,0.01,k,T,y_PID,y1_n_PID,y2_n_PID,y3_n_PID,u_obiekt_PID+d,bufor_PID);
+    [y_PID,y1_n_PID,y2_n_PID,y3_n_PID]=f_obiekt(nr_modelu,0.01,k,T,y_PID,y1_n_PID,y2_n_PID,y3_n_PID,u_obiekt_PID+d);
     y_PID=y_PID+z;
 end
 

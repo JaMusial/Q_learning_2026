@@ -1,5 +1,15 @@
-function [y_n,y1_n,y2_n,y3_n,bufor] = f_obiekt(typ,dt,k,T,y,y1,y2,y3,u,bufor)
+function [y_n,y1_n,y2_n,y3_n] = f_obiekt(typ,dt,k,T,y,y1,y2,y3,u)
 %funkcja odpowiadajaca za symulacje modelu matematycznego
+%
+% DEAD TIME HANDLING:
+% Dead time (T0) is implemented EXTERNALLY in m_regulator_Q.m by buffering
+% the control signal before it enters this function. Set T0 > 0 in
+% m_inicjalizacja.m to add dead time to any model.
+%
+% MODEL COMPATIBILITY NOTES:
+% - Models 2 and 4 are ALIASES for models 1 and 3 (kept for backward compatibility)
+% - Use T0 parameter instead of selecting "with delay" model variants
+% - All models support dead time via external T0 setting
 
 switch typ
     case 1
@@ -9,8 +19,8 @@ switch typ
         y2_n=0;
         y3_n=0;
     case 2
-        %inercja I rzedu z opoznieniem
-        % [u, bufor]=f_bufor(u,bufor);
+        % DEPRECATED: Use model 1 with T0 > 0 instead
+        % This case is an alias for model 1 (kept for backward compatibility)
         y1_n=y1+dt/T(1)*(-y1+k*u);
         y_n=y1_n;
         y2_n=0;
@@ -22,7 +32,12 @@ switch typ
         y_n=y2_n;
         y3_n=0;
     case 4
-        %inercja II rzedu z opoznieniem
+        % DEPRECATED: Use model 3 with T0 > 0 instead
+        % This case is an alias for model 3 (kept for backward compatibility)
+        y1_n=y1+dt/T(1)*(-y1+1*u);
+        y2_n=y2+dt/T(2)*(-y2+k*y1_n);
+        y_n=y2_n;
+        y3_n=0;
     case 5
         %obiekt wieloinercyjny
         y1_n=y1+dt/T(1)*(-y1+1*u);      %y1_n=y1+dt/T(1)*(-y1+k1*u);
