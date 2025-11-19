@@ -29,6 +29,8 @@ else
     m_reset
 end
 
+return
+
 tic
 eps = eps_ini;
 uczenie = 1;
@@ -59,6 +61,10 @@ while epoka <= max_epoki
 end
 
 fprintf("\n Uczenie zakonczono na %d epokach, osiągnieto Te=%f\n\n", epoka, Te);
+
+% Trim preallocated log arrays to actual used size before visualization
+trim_logi = 1;
+m_zapis_logow;
 
 m_rysuj_wykresy
 

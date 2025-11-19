@@ -31,6 +31,10 @@ for iter_test=1:dlugosc_symulacji
     iter=iter+1;
 end
 
+% Trim preallocated log arrays to actual used size
+trim_logi = 1;
+m_zapis_logow;
+
 eks_wer=0;
 
 

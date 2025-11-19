@@ -18,6 +18,9 @@ color_Ref = [0.3010 0.7450 0.9330];     % Cyan (Reference trajectory)
 color_PI = [0.1 0.6 0.1];               % Green (PI controller)
 color_Reward = 'm';                      % Magenta (Reward markers)
 color_Target = [0.5 0.5 0.5];           % Gray (Target lines)
+color_Disturbance = [0.8500 0.3250 0.0980];  % Orange-Red (Disturbances)
+color_Alt = [0.4660 0.6740 0.1880];     % Yellow-Green (Alternative plots)
+color_Purple = [0.4940 0.1840 0.5560];  % Purple (Te normalized)
 
 % Prepare reward markers (set zeros to NaN for cleaner visualization)
 nagroda_y = logi.Q_y .* logi.Q_R;
@@ -35,29 +38,14 @@ nagroda_stan_val(nagroda_stan_val==0) = NaN;
 nagroda_stan_nr = logi.Q_stan_nr .* logi.Q_R;
 nagroda_stan_nr(nagroda_stan_nr==0) = NaN;
 
-%% Main plotting logic
-if poj_iteracja_uczenia == 1
-    % Single iteration mode (Q-controller only, no PI comparison)
-    plot_single_iteration();
-else
-    % Verification mode (Q-controller vs PI controller)
-    plot_with_pi_comparison();
-end
-
-%% Plot MNK filter coefficients (if available)
-if ~isempty(wsp_mnk)
-    plot_mnk_analysis();
-end
-
 %% ========================================================================
-%  HELPER FUNCTIONS
-%  ========================================================================
+%%  SINGLE ITERATION MODE (Q-controller only)
+%% ========================================================================
 
-function plot_single_iteration()
-    % Plot results for single iteration learning mode
+if poj_iteracja_uczenia == 1
 
     %% Figure 1: Output, Control, Disturbance, Control Increment
-    fig1 = figure('Position', [50, 50, 1000, 900]);
+    figure('Position', [50, 50, 1000, 900]);
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
@@ -87,7 +75,7 @@ function plot_single_iteration()
     plot(logi.Q_t, logi.Q_czas_zaklocenia, 'Color', color_Q, 'LineWidth', 1.5);
     ylabel('Disturbance Duration [samples]')
     yyaxis right
-    plot(logi.Q_t, logi.Q_d, 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5);
+    plot(logi.Q_t, logi.Q_d, 'Color', color_Disturbance, 'LineWidth', 1.5);
     ylabel('Load Disturbance d [%]')
     grid on
     xlabel('Time [s]')
@@ -105,7 +93,7 @@ function plot_single_iteration()
     title('Control Signal Increment \Deltau')
 
     %% Figure 2: State and Action Information
-    fig2 = figure('Position', [100, 100, 1000, 900]);
+    figure('Position', [100, 100, 1000, 900]);
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_stan_nr, 'Color', color_Q, 'LineWidth', 1.5);
@@ -129,7 +117,7 @@ function plot_single_iteration()
     grid on
     xlabel('Time [s]')
     ylabel('State Value')
-    title('Continuous State Value (s = e + (1/T_e) \cdot \DeltaE)')
+    title('Continuous State Value (s = e + (1/T_e) \cdot de)')
     legend('Q-controller', 'Reference', 'Reward', 'Location', 'best')
 
     subplot(4,1,3)
@@ -146,7 +134,7 @@ function plot_single_iteration()
     subplot(4,1,4)
     plot(logi.Q_t, logi.Q_akcja_value, 'Color', color_Q, 'LineWidth', 1.5);
     hold on
-    plot(logi.Q_t, logi.Q_akcja_value_bez_f_rzutujacej, 'Color', [0.4660 0.6740 0.1880], 'LineWidth', 1.2);
+    plot(logi.Q_t, logi.Q_akcja_value_bez_f_rzutujacej, 'Color', color_Alt, 'LineWidth', 1.2);
     hold off
     grid on
     xlabel('Time [s]')
@@ -155,7 +143,7 @@ function plot_single_iteration()
     legend('With projection function', 'Without projection function', 'Location', 'best')
 
     %% Figure 3: Error and Derivative Analysis
-    fig3 = figure('Position', [150, 150, 1000, 900]);
+    figure('Position', [150, 150, 1000, 900]);
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
@@ -204,13 +192,53 @@ function plot_single_iteration()
     ylabel('de2')
     title('de2 (Alternative Error Derivative)')
     legend('Q-controller', 'Reference', 'Reward', 'Location', 'best')
-end
 
-function plot_with_pi_comparison()
-    % Plot results comparing Q-controller with PI controller
+    %% Figure 4: MNK Analysis (if available)
+    if ~isempty(wsp_mnk)
+        figure('Position', [200, 200, 1000, 900]);
+
+        subplot(4,1,1)
+        plot(wek_proc_realizacji, 'Color', color_Q, 'LineWidth', 1.5)
+        hold on
+        plot(filtr_mnk, 'Color', color_Disturbance, 'LineWidth', 1.5)
+        plot(wek_Te/max(wek_Te), 'Color', color_Purple, 'LineWidth', 1.5)
+        hold off
+        grid on
+        xlabel('Epoch')
+        ylabel('Normalized Value')
+        title('Learning Progress Metrics')
+        legend('Trajectory realization %', 'MNK filter', 'T_e normalized', 'Location', 'best');
+
+        subplot(4,1,2)
+        plot(wsp_mnk(1,:), 'Color', color_Q, 'LineWidth', 1.5);
+        grid on
+        xlabel('Epoch')
+        ylabel('Coefficient a')
+        title('MNK Coefficient a (Slope)')
+
+        subplot(4,1,3)
+        plot(wsp_mnk(2,:), 'Color', color_Disturbance, 'LineWidth', 1.5);
+        grid on
+        xlabel('Epoch')
+        ylabel('Coefficient b')
+        title('MNK Coefficient b (Intercept)')
+
+        subplot(4,1,4)
+        plot(wsp_mnk(3,:), 'Color', color_Alt, 'LineWidth', 1.5);
+        grid on
+        xlabel('Epoch')
+        ylabel('Coefficient c')
+        title('MNK Coefficient c')
+    end
+
+%% ========================================================================
+%%  VERIFICATION MODE (Q-controller vs PI controller)
+%% ========================================================================
+
+else
 
     %% Figure 1: Output, Control, Disturbance (Q vs PI)
-    fig1 = figure('Position', [50, 50, 1000, 900]);
+    figure('Position', [50, 50, 1000, 900]);
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
@@ -245,7 +273,7 @@ function plot_with_pi_comparison()
     hold off
     ylabel('Control Increment \Deltau [%]')
     yyaxis right
-    plot(logi.Q_t, logi.Q_d, 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5);
+    plot(logi.Q_t, logi.Q_d, 'Color', color_Disturbance, 'LineWidth', 1.5);
     ylabel('Load Disturbance d [%]')
     grid on
     xlabel('Time [s]')
@@ -263,7 +291,7 @@ function plot_with_pi_comparison()
     title('Projection Function (Stability Enhancement)')
 
     %% Figure 2: State and Action (Q vs PI)
-    fig2 = figure('Position', [100, 100, 1000, 900]);
+    figure('Position', [100, 100, 1000, 900]);
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_stan_nr, 'Color', color_Q, 'LineWidth', 1.5);
@@ -316,7 +344,7 @@ function plot_with_pi_comparison()
     legend('Q-controller', 'PI controller', 'Location', 'best')
 
     %% Figure 3: Error and Derivative (Q vs PI)
-    fig3 = figure('Position', [150, 150, 1000, 900]);
+    figure('Position', [150, 150, 1000, 900]);
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
@@ -369,45 +397,43 @@ function plot_with_pi_comparison()
     ylabel('de2')
     title('de2 (Alternative Error Derivative)')
     legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
-end
 
-function plot_mnk_analysis()
-    % Plot MNK (Least Mean Squares) filter analysis
+    %% Figure 4: MNK Analysis (if available)
+    if ~isempty(wsp_mnk)
+        figure('Position', [200, 200, 1000, 900]);
 
-    fig4 = figure('Position', [200, 200, 1000, 900]);
+        subplot(4,1,1)
+        plot(wek_proc_realizacji, 'Color', color_Q, 'LineWidth', 1.5)
+        hold on
+        plot(filtr_mnk, 'Color', color_Disturbance, 'LineWidth', 1.5)
+        plot(wek_Te/max(wek_Te), 'Color', color_Purple, 'LineWidth', 1.5)
+        hold off
+        grid on
+        xlabel('Epoch')
+        ylabel('Normalized Value')
+        title('Learning Progress Metrics')
+        legend('Trajectory realization %', 'MNK filter', 'T_e normalized', 'Location', 'best');
 
-    subplot(4,1,1)
-    plot(wek_proc_realizacji, 'Color', color_Q, 'LineWidth', 1.5)
-    hold on
-    plot(filtr_mnk, 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5)
-    plot(wek_Te/max(wek_Te), 'Color', [0.4940 0.1840 0.5560], 'LineWidth', 1.5)
-    hold off
-    grid on
-    xlabel('Epoch')
-    ylabel('Normalized Value')
-    title('Learning Progress Metrics')
-    legend('Trajectory realization %', 'MNK filter', 'T_e normalized', 'Location', 'best');
+        subplot(4,1,2)
+        plot(wsp_mnk(1,:), 'Color', color_Q, 'LineWidth', 1.5);
+        grid on
+        xlabel('Epoch')
+        ylabel('Coefficient a')
+        title('MNK Coefficient a (Slope)')
 
-    subplot(4,1,2)
-    plot(wsp_mnk(1,:), 'Color', color_Q, 'LineWidth', 1.5);
-    grid on
-    xlabel('Epoch')
-    ylabel('Coefficient a')
-    title('MNK Coefficient a (Slope)')
+        subplot(4,1,3)
+        plot(wsp_mnk(2,:), 'Color', color_Disturbance, 'LineWidth', 1.5);
+        grid on
+        xlabel('Epoch')
+        ylabel('Coefficient b')
+        title('MNK Coefficient b (Intercept)')
 
-    subplot(4,1,3)
-    plot(wsp_mnk(2,:), 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5);
-    grid on
-    xlabel('Epoch')
-    ylabel('Coefficient b')
-    title('MNK Coefficient b (Intercept)')
-
-    subplot(4,1,4)
-    plot(wsp_mnk(3,:), 'Color', [0.4660 0.6740 0.1880], 'LineWidth', 1.5);
-    grid on
-    xlabel('Epoch')
-    ylabel('Coefficient c')
-    title('MNK Coefficient c')
-end
+        subplot(4,1,4)
+        plot(wsp_mnk(3,:), 'Color', color_Alt, 'LineWidth', 1.5);
+        grid on
+        xlabel('Epoch')
+        ylabel('Coefficient c')
+        title('MNK Coefficient c')
+    end
 
 end

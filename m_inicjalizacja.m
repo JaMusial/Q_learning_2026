@@ -63,12 +63,12 @@ rozmiar_okna_sredniej_realizacji = 5;
 
 SP_ini = 50;
 k = 1;
-T0 = 0;
+T0 = 2;
 dodatkowe_probki_reka = 5;
 
 % Selected model: Third order pneumatic system
 T = [2.34 1.55 9.38];
-nr_modelu = 8;
+nr_modelu = 1;
 Ks = tf(0.994, [T(1) 1]) * tf(0.968, [T(2) 1]) * tf(0.4, [T(3) 1]);
 
 % Initialize delay buffers if T0 is non-zero
@@ -115,6 +115,8 @@ y_PID = 0;
 u_PID = 0;
 zapis_logi_PID = 0;
 reset_logi = 0;
+logi_idx = 0;
+trim_logi = 0;
 maxS = 0;
 Q_update = 0;
 iter = 1;

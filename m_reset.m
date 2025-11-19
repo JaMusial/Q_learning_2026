@@ -55,3 +55,8 @@ end
 if exist('realizacja_traj_epoka_idx', 'var')
     realizacja_traj_epoka_idx = 0;
 end
+
+% Reset logging index for new epoch
+if exist('logi_idx', 'var')
+    logi_idx = 0;
+end
