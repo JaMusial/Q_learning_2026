@@ -1,0 +1,23 @@
+# Profiling results
+profile_results/
+profiler_test.m
+
+# MATLAB autosave files
+*.asv
+
+# MATLAB temporary files
+*.m~
+
+# Output files
+*.mat
+!initial_data.mat
+
+# Figures
+*.fig
+*.png
+*.jpg
+*.gif
+
+# OS files
+.DS_Store
+Thumbs.db
