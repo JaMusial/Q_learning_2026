@@ -24,8 +24,9 @@ if poj_iteracja_uczenia == 1
     zapis_logi = 1;
     m_reset
 else
+    % Run initial verification to establish baseline (logi_before_learning)
     m_eksperyment_weryfikacyjny
-    m_rysuj_wykresy
+    % Note: Plots generated only at the end for final comparison
     m_reset
 end
 
@@ -64,11 +65,15 @@ fprintf("\n Uczenie zakonczono na %d epokach, osiągnieto Te=%f\n\n", epoka, Te)
 trim_logi = 1;
 m_zapis_logow;
 
-m_rysuj_wykresy
+% Single iteration mode: show training plots
+if poj_iteracja_uczenia == 1
+    m_rysuj_wykresy
+end
 
+% Verification mode: run final verification and generate comparison plots
 if poj_iteracja_uczenia == 0
     m_eksperyment_weryfikacyjny
-    m_rysuj_wykresy  % Show comparison plots after verification
+    m_rysuj_wykresy  % Show all comparison plots (before vs after learning)
     figure()
     mesh(Q_2d)
 end

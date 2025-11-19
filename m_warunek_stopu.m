@@ -22,7 +22,7 @@ end
 %rozpoczecie kolejnej epoki uczenia
 if warunek_stopu==1
 
-   
+
     Q_2d_save=Q_2d;
 
 

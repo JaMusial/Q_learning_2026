@@ -32,6 +32,7 @@ if reset_logi==1 || exist('logi','var') == 0
     logi.Q_u_increment_bez_f_rzutujacej = zeros(1, max_samples);
     logi.Q_t = zeros(1, max_samples);
     logi.Q_d = zeros(1, max_samples);
+    logi.Q_SP = zeros(1, max_samples);
     logi.Q_czas_zaklocenia = zeros(1, max_samples);
     logi.Q_maxS = zeros(1, max_samples);
     logi.Q_table_update = zeros(1, max_samples);
@@ -87,6 +88,7 @@ if zapis_logi==1
     logi.Q_u_increment_bez_f_rzutujacej(logi_idx) = u_increment_bez_f_rzutujacej;
     logi.Q_t(logi_idx) = t;
     logi.Q_d(logi_idx) = d;
+    logi.Q_SP(logi_idx) = f_skalowanie(wart_max_y, wart_min_y, proc_max_y, proc_min_y, SP);
     logi.Q_czas_zaklocenia(logi_idx) = maksymalna_ilosc_iteracji_uczenia;
     logi.Q_maxS(logi_idx) = maxS;
     logi.Q_table_update(logi_idx) = Q_update;
@@ -134,6 +136,7 @@ if exist('trim_logi', 'var') && trim_logi == 1
     logi.Q_u_increment_bez_f_rzutujacej = logi.Q_u_increment_bez_f_rzutujacej(1:logi_idx);
     logi.Q_t = logi.Q_t(1:logi_idx);
     logi.Q_d = logi.Q_d(1:logi_idx);
+    logi.Q_SP = logi.Q_SP(1:logi_idx);
     logi.Q_czas_zaklocenia = logi.Q_czas_zaklocenia(1:logi_idx);
     logi.Q_maxS = logi.Q_maxS(1:logi_idx);
     logi.Q_table_update = logi.Q_table_update(1:logi_idx);

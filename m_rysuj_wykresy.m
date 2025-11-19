@@ -23,6 +23,7 @@ color_Alt = [0.4660 0.6740 0.1880];     % Yellow-Green (Alternative plots)
 color_Purple = [0.4940 0.1840 0.5560];  % Purple (Te normalized)
 color_Q_before = [0.3010 0.7450 0.9330];  % Cyan (Q before learning)
 color_Q_after = [1 0 0];                  % Red (Q after learning)
+color_Total = [1 0 0];                    % Red (Total/Maximum aggregated metrics)
 
 % Prepare reward markers (set zeros to NaN for cleaner visualization)
 nagroda_y = logi.Q_y .* logi.Q_R;
@@ -239,7 +240,210 @@ if poj_iteracja_uczenia == 1
 
 else
 
-    %% Figure 1: Output, Control, Disturbance (Q vs PI)
+    %% ====================================================================
+    %%  BEFORE LEARNING: Detailed Comparison (if data available)
+    %% ====================================================================
+
+    if exist('logi_before_learning', 'var') && licz_wskazniki == 0
+        % Prepare reward markers for before-learning data
+        nagroda_y_before = logi_before_learning.Q_y .* logi_before_learning.Q_R;
+        nagroda_y_before(nagroda_y_before==0) = NaN;
+        nagroda_u_before = logi_before_learning.Q_u .* logi_before_learning.Q_R;
+        nagroda_u_before(nagroda_u_before==0) = NaN;
+        nagroda_e_before = logi_before_learning.Q_e .* logi_before_learning.Q_R;
+        nagroda_e_before(nagroda_e_before==0) = NaN;
+        nagroda_de_before = logi_before_learning.Q_de .* logi_before_learning.Q_R;
+        nagroda_de_before(nagroda_de_before==0) = NaN;
+        nagroda_de2_before = logi_before_learning.Q_de2 .* logi_before_learning.Q_R;
+        nagroda_de2_before(nagroda_de2_before==0) = NaN;
+        nagroda_stan_val_before = logi_before_learning.Q_stan_value .* logi_before_learning.Q_R;
+        nagroda_stan_val_before(nagroda_stan_val_before==0) = NaN;
+        nagroda_stan_nr_before = logi_before_learning.Q_stan_nr .* logi_before_learning.Q_R;
+        nagroda_stan_nr_before(nagroda_stan_nr_before==0) = NaN;
+
+        %% Figure 1 (Before): Output, Control, Disturbance (Q vs PI) - BEFORE LEARNING
+        figure()
+
+        subplot(4,1,1)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
+        hold on
+        plot(logi_before_learning.Q_t, logi_before_learning.Ref_y, 'Color', color_Ref, 'LineWidth', 1.2)
+        plot(logi_before_learning.Q_t, nagroda_y_before, '|', 'Color', color_Reward, 'MarkerSize', 8)
+        if isfield(logi_before_learning, 'PID_t') && ~isempty(logi_before_learning.PID_t)
+            plot(logi_before_learning.PID_t, logi_before_learning.PID_y, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('Output y [%]')
+        title('Process Variable y - Q vs PI (BEFORE LEARNING)')
+        legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+
+        subplot(4,1,2)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_u, 'Color', color_Q, 'LineWidth', 1.5)
+        hold on
+        plot(logi_before_learning.Q_t, nagroda_u_before, '|', 'Color', color_Reward, 'MarkerSize', 8)
+        if isfield(logi_before_learning, 'PID_t') && ~isempty(logi_before_learning.PID_t)
+            plot(logi_before_learning.PID_t, logi_before_learning.PID_u, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('Control Signal u [%]')
+        title('Control Signal u - Q vs PI (BEFORE LEARNING)')
+        legend('Q-controller', 'Reward', 'PI controller', 'Location', 'best')
+
+        subplot(4,1,3)
+        yyaxis left
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_u_increment, 'Color', color_Q, 'LineWidth', 1.5);
+        hold on
+        if isfield(logi_before_learning, 'PID_t') && ~isempty(logi_before_learning.PID_t)
+            plot(logi_before_learning.PID_t, logi_before_learning.PID_u_increment, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        hold off
+        ylabel('Control Increment \Deltau [%]')
+        yyaxis right
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_d, 'Color', color_Disturbance, 'LineWidth', 1.5);
+        ylabel('Load Disturbance d [%]')
+        grid on
+        xlabel('Time [s]')
+        title('Control Increment and Load Disturbance (BEFORE LEARNING)')
+        legend('Q increment', 'PI increment', 'Disturbance d', 'Location', 'best')
+
+        subplot(4,1,4)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_funkcja_rzut, 'Color', color_Q, 'LineWidth', 1.5);
+        hold on
+        yline(0, 'Color', color_Target, 'LineWidth', 1);
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('Projection Function Value')
+        title('Projection Function (BEFORE LEARNING)')
+
+        %% Figure 2 (Before): State and Action (Q vs PI) - BEFORE LEARNING
+        figure()
+
+        subplot(4,1,1)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_stan_nr, 'Color', color_Q, 'LineWidth', 1.5);
+        hold on
+        plot(logi_before_learning.Q_t, logi_before_learning.Ref_stan_nr, 'Color', color_Ref, 'LineWidth', 1.2);
+        plot(logi_before_learning.Q_t, nagroda_stan_nr_before, '|', 'Color', color_Reward, 'MarkerSize', 8);
+        if isfield(logi_before_learning, 'PID_t') && ~isempty(logi_before_learning.PID_t)
+            plot(logi_before_learning.PID_t, logi_before_learning.PID_stan_nr, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        yline(nr_stanu_doc, 'Color', color_Target, 'LineWidth', 1, 'LineStyle', '--');
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('State Index')
+        title('Discrete State Index - Q vs PI (BEFORE LEARNING)')
+        legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Target state', 'Location', 'best');
+
+        subplot(4,1,2)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_stan_value, 'Color', color_Q, 'LineWidth', 1.5);
+        hold on
+        plot(logi_before_learning.Q_t, logi_before_learning.Ref_stan_value, 'Color', color_Ref, 'LineWidth', 1.2)
+        plot(logi_before_learning.Q_t, nagroda_stan_val_before, '|', 'Color', color_Reward, 'MarkerSize', 8);
+        if isfield(logi_before_learning, 'PID_t') && ~isempty(logi_before_learning.PID_t)
+            plot(logi_before_learning.PID_t, logi_before_learning.PID_akcja_value, 'Color', color_PI, 'LineWidth', 1.5);
+        end
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('State Value')
+        title('Continuous State Value - Q vs PI (BEFORE LEARNING)')
+        legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+
+        subplot(4,1,3)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_akcja_nr, 'Color', color_Q, 'LineWidth', 1.5);
+        hold on
+        if isfield(logi_before_learning, 'PID_t') && ~isempty(logi_before_learning.PID_t)
+            plot(logi_before_learning.PID_t, logi_before_learning.PID_akcja_nr, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        yline(nr_akcji_doc, 'Color', color_Target, 'LineWidth', 1, 'LineStyle', '--');
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('Action Index')
+        title('Selected Action Index - Q vs PI (BEFORE LEARNING)')
+        legend('Q action', 'PI action', 'Target action', 'Location', 'best')
+
+        subplot(4,1,4)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_akcja_value, 'Color', color_Q, 'LineWidth', 1.5);
+        hold on
+        if isfield(logi_before_learning, 'PID_t') && ~isempty(logi_before_learning.PID_t)
+            plot(logi_before_learning.PID_t, logi_before_learning.PID_akcja_value, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('Action Value')
+        title('Action Value - Q vs PI (BEFORE LEARNING)')
+        legend('Q-controller', 'PI controller', 'Location', 'best')
+
+        %% Figure 3 (Before): Error and Derivative (Q vs PI) - BEFORE LEARNING
+        figure()
+
+        subplot(4,1,1)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_e, 'Color', color_Q, 'LineWidth', 1.5)
+        hold on
+        plot(logi_before_learning.Q_t, logi_before_learning.Ref_e, 'Color', color_Ref, 'LineWidth', 1.2)
+        plot(logi_before_learning.Q_t, nagroda_e_before, '|', 'Color', color_Reward, 'MarkerSize', 8)
+        if isfield(logi_before_learning, 'PID_t') && ~isempty(logi_before_learning.PID_t)
+            plot(logi_before_learning.PID_t, logi_before_learning.PID_e, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('Error e [%]')
+        title('Control Error e = SP - y (BEFORE LEARNING)')
+        legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+
+        subplot(4,1,2)
+        if isfield(logi_before_learning, 'Q_SP') && ~isempty(logi_before_learning.Q_SP)
+            plot(logi_before_learning.Q_t, logi_before_learning.Q_SP, 'Color', color_Target, 'LineWidth', 1.5, 'LineStyle', '--')
+        end
+        grid on
+        xlabel('Time [s]')
+        ylabel('Setpoint SP [%]')
+        title('Setpoint Changes (BEFORE LEARNING)')
+
+        subplot(4,1,3)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_de, 'Color', color_Q, 'LineWidth', 1.5)
+        hold on
+        plot(logi_before_learning.Q_t, logi_before_learning.Ref_de, 'Color', color_Ref, 'LineWidth', 1.2)
+        plot(logi_before_learning.Q_t, nagroda_de_before, '|', 'Color', color_Reward, 'MarkerSize', 8)
+        if isfield(logi_before_learning, 'PID_t') && ~isempty(logi_before_learning.PID_t)
+            plot(logi_before_learning.PID_t, logi_before_learning.PID_de, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('de [%/s]')
+        title('Error Derivative de/dt (BEFORE LEARNING)')
+        legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+
+        subplot(4,1,4)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_de2, 'Color', color_Q, 'LineWidth', 1.5)
+        hold on
+        plot(logi_before_learning.Q_t, logi_before_learning.Ref_de2, 'Color', color_Ref, 'LineWidth', 1.2)
+        plot(logi_before_learning.Q_t, nagroda_de2_before, '|', 'Color', color_Reward, 'MarkerSize', 8)
+        if isfield(logi_before_learning, 'PID_t') && ~isempty(logi_before_learning.PID_t)
+            plot(logi_before_learning.PID_t, logi_before_learning.PID_de2, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('de2')
+        title('de2 (Alternative Error Derivative) (BEFORE LEARNING)')
+        legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+    end
+
+    %% ====================================================================
+    %%  AFTER LEARNING: Detailed Comparison
+    %% ====================================================================
+
+    %% Figure 1 (After): Output, Control, Disturbance (Q vs PI) - AFTER LEARNING
     figure()
 
     subplot(4,1,1)
@@ -252,7 +456,7 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('Output y [%]')
-    title('Process Variable y - Q vs PI Comparison')
+    title('Process Variable y - Q vs PI (AFTER LEARNING)')
     legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
 
     subplot(4,1,2)
@@ -264,7 +468,7 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('Control Signal u [%]')
-    title('Control Signal u - Q vs PI Comparison')
+    title('Control Signal u - Q vs PI (AFTER LEARNING)')
     legend('Q-controller', 'Reward', 'PI controller', 'Location', 'best')
 
     subplot(4,1,3)
@@ -279,7 +483,7 @@ else
     ylabel('Load Disturbance d [%]')
     grid on
     xlabel('Time [s]')
-    title('Control Increment and Load Disturbance')
+    title('Control Increment and Load Disturbance (AFTER LEARNING)')
     legend('Q increment', 'PI increment', 'Disturbance d', 'Location', 'best')
 
     subplot(4,1,4)
@@ -290,9 +494,9 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('Projection Function Value')
-    title('Projection Function (Stability Enhancement)')
+    title('Projection Function (AFTER LEARNING)')
 
-    %% Figure 2: State and Action (Q vs PI)
+    %% Figure 2 (After): State and Action (Q vs PI) - AFTER LEARNING
     figure()
 
     subplot(4,1,1)
@@ -306,7 +510,7 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('State Index')
-    title('Discrete State Index - Q vs PI')
+    title('Discrete State Index - Q vs PI (AFTER LEARNING)')
     legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Target state', 'Location', 'best');
 
     subplot(4,1,2)
@@ -319,7 +523,7 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('State Value')
-    title('Continuous State Value - Q vs PI')
+    title('Continuous State Value - Q vs PI (AFTER LEARNING)')
     legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
 
     subplot(4,1,3)
@@ -331,7 +535,7 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('Action Index')
-    title('Selected Action Index - Q vs PI')
+    title('Selected Action Index - Q vs PI (AFTER LEARNING)')
     legend('Q action', 'PI action', 'Target action', 'Location', 'best')
 
     subplot(4,1,4)
@@ -342,49 +546,49 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('Action Value')
-    title('Action Value - Q vs PI')
+    title('Action Value - Q vs PI (AFTER LEARNING)')
     legend('Q-controller', 'PI controller', 'Location', 'best')
 
-    %% Figure 3: Error and Derivative (Q vs PI)
+    %% Figure 3 (After): Error and Derivative (Q vs PI) - AFTER LEARNING
     figure()
 
     subplot(4,1,1)
-    plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
-    hold on
-    plot(logi.Q_t, logi.Ref_y, 'Color', color_Ref, 'LineWidth', 1.2)
-    plot(logi.Q_t, nagroda_y, '|', 'Color', color_Reward, 'MarkerSize', 8)
-    plot(logi.PID_t, logi.PID_y, 'Color', color_PI, 'LineWidth', 1.5)
-    hold off
-    grid on
-    xlabel('Time [s]')
-    ylabel('Output y [%]')
-    title('Process Variable y')
-    legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
-
-    subplot(4,1,2)
     plot(logi.Q_t, logi.Q_e, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, logi.Ref_e, 'Color', color_Ref, 'LineWidth', 1.2)
     plot(logi.Q_t, nagroda_e, '|', 'Color', color_Reward, 'MarkerSize', 8)
-    plot(logi.PID_t, logi.PID_e, 'Color', color_PI, 'LineWidth', 1.5)
+    if isfield(logi, 'PID_t') && ~isempty(logi.PID_t)
+        plot(logi.PID_t, logi.PID_e, 'Color', color_PI, 'LineWidth', 1.5)
+    end
     hold off
     grid on
     xlabel('Time [s]')
     ylabel('Error e [%]')
-    title('Control Error e = SP - y')
+    title('Control Error e = SP - y (AFTER LEARNING)')
     legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+
+    subplot(4,1,2)
+    if isfield(logi, 'Q_SP') && ~isempty(logi.Q_SP)
+        plot(logi.Q_t, logi.Q_SP, 'Color', color_Target, 'LineWidth', 1.5, 'LineStyle', '--')
+    end
+    grid on
+    xlabel('Time [s]')
+    ylabel('Setpoint SP [%]')
+    title('Setpoint Changes (AFTER LEARNING)')
 
     subplot(4,1,3)
     plot(logi.Q_t, logi.Q_de, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, logi.Ref_de, 'Color', color_Ref, 'LineWidth', 1.2)
     plot(logi.Q_t, nagroda_de, '|', 'Color', color_Reward, 'MarkerSize', 8)
-    plot(logi.PID_t, logi.PID_de, 'Color', color_PI, 'LineWidth', 1.5)
+    if isfield(logi, 'PID_t') && ~isempty(logi.PID_t)
+        plot(logi.PID_t, logi.PID_de, 'Color', color_PI, 'LineWidth', 1.5)
+    end
     hold off
     grid on
     xlabel('Time [s]')
     ylabel('de [%/s]')
-    title('Error Derivative de/dt')
+    title('Error Derivative de/dt (AFTER LEARNING)')
     legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
 
     subplot(4,1,4)
@@ -392,12 +596,14 @@ else
     hold on
     plot(logi.Q_t, logi.Ref_de2, 'Color', color_Ref, 'LineWidth', 1.2)
     plot(logi.Q_t, nagroda_de2, '|', 'Color', color_Reward, 'MarkerSize', 8)
-    plot(logi.PID_t, logi.PID_de2, 'Color', color_PI, 'LineWidth', 1.5)
+    if isfield(logi, 'PID_t') && ~isempty(logi.PID_t)
+        plot(logi.PID_t, logi.PID_de2, 'Color', color_PI, 'LineWidth', 1.5)
+    end
     hold off
     grid on
     xlabel('Time [s]')
     ylabel('de2')
-    title('de2 (Alternative Error Derivative)')
+    title('de2 (Alternative Error Derivative) (AFTER LEARNING)')
     legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
 
     %% Figure 4: MNK Analysis (if available)
@@ -490,14 +696,15 @@ else
     if exist('inf_zakonczono_epoke_stabil_old', 'var') && exist('czas_uczenia_calkowity', 'var')
         figure()
 
-        % Percent stabilization per epoch
+        % Percent stabilization per epoch group (every 100 epochs)
         subplot(4,1,1)
-        if exist('proc_stabil_per_epoch', 'var') && ~isempty(proc_stabil_per_epoch)
-            plot(proc_stabil_per_epoch, 'Color', color_Q, 'LineWidth', 1.5)
+        if exist('proc_stab_wek', 'var') && length(proc_stab_wek) > 1
+            x_epochs = (1:length(proc_stab_wek)) * probkowanie_dane_symulacji;
+            plot(x_epochs, proc_stab_wek * 100, 'Color', color_Q, 'LineWidth', 1.5, 'Marker', 'o')
             grid on
-            xlabel('Epoch Group')
+            xlabel('Epoch')
             ylabel('Stabilization [%]')
-            title('Percentage of Epochs Ending in Stabilization')
+            title('Percentage of Epochs Ending in Stabilization (per 100-epoch group)')
         else
             % Calculate from available data if vector doesn't exist
             total_epochs = epoka - 1;
@@ -511,14 +718,15 @@ else
             end
         end
 
-        % Learning time per epoch
+        % Learning time per epoch group (every 100 epochs)
         subplot(4,1,2)
-        if exist('learning_time_per_epoch', 'var') && ~isempty(learning_time_per_epoch)
-            plot(learning_time_per_epoch, 'Color', color_Disturbance, 'LineWidth', 1.5)
+        if exist('czas_uczenia_wek', 'var') && length(czas_uczenia_wek) > 1
+            x_epochs = (1:length(czas_uczenia_wek)) * probkowanie_dane_symulacji;
+            plot(x_epochs, czas_uczenia_wek, 'Color', color_Disturbance, 'LineWidth', 1.5, 'Marker', 'o')
             grid on
-            xlabel('Epoch Group')
+            xlabel('Epoch')
             ylabel('Time [s]')
-            title('Learning Time per Epoch')
+            title(sprintf('Learning Time per %d Epochs', probkowanie_dane_symulacji))
         else
             % Show total learning time
             bar(czas_uczenia_calkowity, 'FaceColor', color_Disturbance)
@@ -551,72 +759,90 @@ else
     end
 
     %% ====================================================================
-    %%  PERFORMANCE METRICS
+    %%  PERFORMANCE METRICS (Evolution during Learning)
     %% ====================================================================
 
-    if exist('IAE_wek', 'var') && ~isempty(IAE_wek)
+    if exist('IAE_wek', 'var') && ~isempty(IAE_wek) && size(IAE_wek, 1) > 1
         figure()
 
-        % IAE comparison
-        subplot(5,1,1)
-        if length(IAE_wek) >= 2
-            bar_data = [IAE_wek(1), IAE_wek(2)];  % PI, Q-learning
-            bar_colors = [color_PI; color_Q_after];
-            b = bar(bar_data);
-            b.FaceColor = 'flat';
-            b.CData = bar_colors;
-            grid on
-            ylabel('IAE')
-            title('Integral Absolute Error (IAE) Comparison')
-            set(gca, 'XTickLabel', {'PI', 'Q-learning'})
-        end
+        % IAE evolution during learning - breakdown by phase (every 100 epochs)
+        subplot(4,1,1)
+        x_epochs = (1:size(IAE_wek, 1)) * probkowanie_norma_macierzy;
 
-        % IAE trajectory (if available)
-        subplot(5,1,2)
-        if exist('IAE_traj_wek', 'var') && ~isempty(IAE_traj_wek)
-            plot(IAE_traj_wek, 'Color', color_Q, 'LineWidth', 1.5)
-            grid on
-            xlabel('Sample')
-            ylabel('IAE')
-            title('IAE Trajectory Over Time')
+        % Calculate total IAE (sum of all 3 phases)
+        if size(IAE_wek, 2) >= 3
+            IAE_total = sum(IAE_wek, 2);
+            plot(x_epochs, IAE_total, 'Color', color_Total, 'LineWidth', 2, 'Marker', 'o', 'DisplayName', 'Total')
+            hold on
+            plot(x_epochs, IAE_wek(:,1), 'Color', color_Q, 'LineWidth', 1.2, 'Marker', '^', 'LineStyle', '--', 'DisplayName', 'Phase 1: Setpoint tracking')
+            plot(x_epochs, IAE_wek(:,2), 'Color', color_Disturbance, 'LineWidth', 1.2, 'Marker', 's', 'LineStyle', '--', 'DisplayName', 'Phase 2: Disturbance rejection')
+            plot(x_epochs, IAE_wek(:,3), 'Color', color_Alt, 'LineWidth', 1.2, 'Marker', 'd', 'LineStyle', '--', 'DisplayName', 'Phase 3: Recovery')
+            hold off
+        else
+            plot(x_epochs, IAE_wek, 'Color', color_Q, 'LineWidth', 1.5, 'Marker', 'o')
         end
+        grid on
+        xlabel('Epoch')
+        ylabel('IAE')
+        title('Integral Absolute Error (IAE) Evolution During Learning')
+        legend('Location', 'best')
 
-        % Overshoot comparison
-        subplot(5,1,3)
-        if exist('maks_przereg_wek', 'var') && length(maks_przereg_wek) >= 2
-            bar_data = [maks_przereg_wek(1), maks_przereg_wek(2)];
-            bar_colors = [color_PI; color_Q_after];
-            b = bar(bar_data);
-            b.FaceColor = 'flat';
-            b.CData = bar_colors;
+        % Overshoot evolution during learning - breakdown by phase (every 100 epochs)
+        subplot(4,1,2)
+        if exist('maks_przereg_wek', 'var') && ~isempty(maks_przereg_wek)
+            x_epochs = (1:size(maks_przereg_wek, 1)) * probkowanie_norma_macierzy;
+
+            % Show max overshoot across all phases
+            if size(maks_przereg_wek, 2) >= 3
+                przereg_max = max(maks_przereg_wek, [], 2);
+                plot(x_epochs, przereg_max, 'Color', color_Total, 'LineWidth', 2, 'Marker', 'o', 'DisplayName', 'Maximum')
+                hold on
+                plot(x_epochs, maks_przereg_wek(:,1), 'Color', color_Q, 'LineWidth', 1.2, 'Marker', '^', 'LineStyle', '--', 'DisplayName', 'Phase 1')
+                plot(x_epochs, maks_przereg_wek(:,2), 'Color', color_Disturbance, 'LineWidth', 1.2, 'Marker', 's', 'LineStyle', '--', 'DisplayName', 'Phase 2')
+                plot(x_epochs, maks_przereg_wek(:,3), 'Color', color_Alt, 'LineWidth', 1.2, 'Marker', 'd', 'LineStyle', '--', 'DisplayName', 'Phase 3')
+                hold off
+            else
+                plot(x_epochs, maks_przereg_wek, 'Color', color_Disturbance, 'LineWidth', 1.5, 'Marker', 'o')
+            end
             grid on
+            xlabel('Epoch')
             ylabel('Overshoot [%]')
-            title('Maximum Overshoot Comparison')
-            set(gca, 'XTickLabel', {'PI', 'Q-learning'})
+            title('Maximum Overshoot Evolution During Learning')
+            legend('Location', 'best')
         end
 
-        % Settling time comparison
-        subplot(5,1,4)
-        if exist('czas_regulacji_wek', 'var') && length(czas_regulacji_wek) >= 2
-            bar_data = [czas_regulacji_wek(1), czas_regulacji_wek(2)];
-            bar_colors = [color_PI; color_Q_after];
-            b = bar(bar_data);
-            b.FaceColor = 'flat';
-            b.CData = bar_colors;
+        % Settling time evolution during learning - breakdown by phase (every 100 epochs)
+        subplot(4,1,3)
+        if exist('czas_regulacji_wek', 'var') && ~isempty(czas_regulacji_wek)
+            x_epochs = (1:size(czas_regulacji_wek, 1)) * probkowanie_norma_macierzy;
+
+            % Show max settling time across all phases
+            if size(czas_regulacji_wek, 2) >= 3
+                czas_max = max(czas_regulacji_wek, [], 2);
+                plot(x_epochs, czas_max, 'Color', color_Total, 'LineWidth', 2, 'Marker', 'o', 'DisplayName', 'Maximum')
+                hold on
+                plot(x_epochs, czas_regulacji_wek(:,1), 'Color', color_Q, 'LineWidth', 1.2, 'Marker', '^', 'LineStyle', '--', 'DisplayName', 'Phase 1')
+                plot(x_epochs, czas_regulacji_wek(:,2), 'Color', color_Disturbance, 'LineWidth', 1.2, 'Marker', 's', 'LineStyle', '--', 'DisplayName', 'Phase 2')
+                plot(x_epochs, czas_regulacji_wek(:,3), 'Color', color_Alt, 'LineWidth', 1.2, 'Marker', 'd', 'LineStyle', '--', 'DisplayName', 'Phase 3')
+                hold off
+            else
+                plot(x_epochs, czas_regulacji_wek, 'Color', color_Alt, 'LineWidth', 1.5, 'Marker', 'o')
+            end
             grid on
+            xlabel('Epoch')
             ylabel('Settling Time [s]')
-            title('Settling Time Comparison')
-            set(gca, 'XTickLabel', {'PI', 'Q-learning'})
+            title('Settling Time Evolution During Learning')
+            legend('Location', 'best')
         end
 
-        % Trajectory realization percentage
-        subplot(5,1,5)
-        if exist('proc_realizacji_traj', 'var') && ~isempty(proc_realizacji_traj)
-            plot(proc_realizacji_traj, 'Color', color_Purple, 'LineWidth', 1.5)
+        % Trajectory realization percentage (every epoch)
+        subplot(4,1,4)
+        if exist('wek_proc_realizacji', 'var') && ~isempty(wek_proc_realizacji)
+            plot(wek_proc_realizacji, 'Color', color_Purple, 'LineWidth', 1.5)
             grid on
-            xlabel('Sample')
+            xlabel('Epoch')
             ylabel('Realization [%]')
-            title('Trajectory Realization Percentage')
+            title('Trajectory Realization Percentage Evolution')
         end
     end
 
