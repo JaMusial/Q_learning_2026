@@ -5,6 +5,7 @@
 %
 % Features:
 %   - Theme-neutral colors (works on both light and dark MATLAB themes)
+%   - Single figure window with organized subplots
 %   - Proper figure sizing for readability
 %   - Axis labels with units
 %   - Safety checks for empty variables
@@ -44,10 +45,11 @@ nagroda_stan_nr(nagroda_stan_nr==0) = NaN;
 
 if poj_iteracja_uczenia == 1
 
-    %% Figure 1: Output, Control, Disturbance, Control Increment
-    figure('Position', [50, 50, 1000, 900]);
+    %% Create single large figure with all plots
+    fig1 = figure('Position', [50, 50, 1600, 1200], 'Name', 'Q-Learning Results', 'NumberTitle', 'off');
 
-    subplot(4,1,1)
+    % Row 1: Output and Control
+    subplot(4, 3, 1)
     plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, logi.Ref_y, 'Color', color_Ref, 'LineWidth', 1.2)
@@ -57,45 +59,32 @@ if poj_iteracja_uczenia == 1
     xlabel('Time [s]')
     ylabel('Output y [%]')
     title('Process Variable y')
-    legend('Q-controller', 'Reference', 'Reward', 'Location', 'best')
+    legend('Q', 'Ref', 'Reward', 'Location', 'best')
 
-    subplot(4,1,2)
+    subplot(4, 3, 2)
     plot(logi.Q_t, logi.Q_u, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, nagroda_u, '|', 'Color', color_Reward, 'MarkerSize', 8)
     hold off
     grid on
     xlabel('Time [s]')
-    ylabel('Control Signal u [%]')
+    ylabel('Control u [%]')
     title('Control Signal u')
-    legend('Q-controller', 'Reward', 'Location', 'best')
+    legend('Q', 'Reward', 'Location', 'best')
 
-    subplot(4,1,3)
+    subplot(4, 3, 3)
     yyaxis left
     plot(logi.Q_t, logi.Q_czas_zaklocenia, 'Color', color_Q, 'LineWidth', 1.5);
-    ylabel('Disturbance Duration [samples]')
+    ylabel('Disturbance [samples]')
     yyaxis right
     plot(logi.Q_t, logi.Q_d, 'Color', color_Disturbance, 'LineWidth', 1.5);
-    ylabel('Load Disturbance d [%]')
+    ylabel('Load d [%]')
     grid on
     xlabel('Time [s]')
-    title('Disturbance Information')
-    legend('Disturbance samples', 'Load disturbance d', 'Location', 'best')
+    title('Disturbance')
 
-    subplot(4,1,4)
-    plot(logi.Q_t, logi.Q_u_increment, 'Color', color_Q, 'LineWidth', 1.5);
-    hold on
-    yline(0, 'Color', color_Target, 'LineWidth', 1);
-    hold off
-    grid on
-    xlabel('Time [s]')
-    ylabel('\Deltau [%]')
-    title('Control Signal Increment \Deltau')
-
-    %% Figure 2: State and Action Information
-    figure('Position', [100, 100, 1000, 900]);
-
-    subplot(4,1,1)
+    % Row 2: States
+    subplot(4, 3, 4)
     plot(logi.Q_t, logi.Q_stan_nr, 'Color', color_Q, 'LineWidth', 1.5);
     hold on
     plot(logi.Q_t, logi.Ref_stan_nr, 'Color', color_Ref, 'LineWidth', 1.2);
@@ -105,10 +94,10 @@ if poj_iteracja_uczenia == 1
     grid on
     xlabel('Time [s]')
     ylabel('State Index')
-    title('Discrete State Index')
-    legend('Q-controller', 'Reference', 'Reward', 'Target state', 'Location', 'best');
+    title('State Index')
+    legend('Q', 'Ref', 'Reward', 'Target', 'Location', 'best');
 
-    subplot(4,1,2)
+    subplot(4, 3, 5)
     plot(logi.Q_t, logi.Q_stan_value, 'Color', color_Q, 'LineWidth', 1.5);
     hold on
     plot(logi.Q_t, logi.Ref_stan_value, 'Color', color_Ref, 'LineWidth', 1.2)
@@ -117,10 +106,21 @@ if poj_iteracja_uczenia == 1
     grid on
     xlabel('Time [s]')
     ylabel('State Value')
-    title('Continuous State Value (s = e + (1/T_e) \cdot de)')
-    legend('Q-controller', 'Reference', 'Reward', 'Location', 'best')
+    title('State Value')
+    legend('Q', 'Ref', 'Reward', 'Location', 'best')
 
-    subplot(4,1,3)
+    subplot(4, 3, 6)
+    plot(logi.Q_t, logi.Q_u_increment, 'Color', color_Q, 'LineWidth', 1.5);
+    hold on
+    yline(0, 'Color', color_Target, 'LineWidth', 1);
+    hold off
+    grid on
+    xlabel('Time [s]')
+    ylabel('\Deltau [%]')
+    title('Control Increment')
+
+    % Row 3: Actions and Errors
+    subplot(4, 3, 7)
     plot(logi.Q_t, logi.Q_akcja_nr, 'Color', color_Q, 'LineWidth', 1.5);
     hold on
     yline(nr_akcji_doc, 'Color', color_Target, 'LineWidth', 1, 'LineStyle', '--');
@@ -128,10 +128,10 @@ if poj_iteracja_uczenia == 1
     grid on
     xlabel('Time [s]')
     ylabel('Action Index')
-    title('Selected Action Index')
-    legend('Q action', 'Target action', 'Location', 'best')
+    title('Action Index')
+    legend('Q', 'Target', 'Location', 'best')
 
-    subplot(4,1,4)
+    subplot(4, 3, 8)
     plot(logi.Q_t, logi.Q_akcja_value, 'Color', color_Q, 'LineWidth', 1.5);
     hold on
     plot(logi.Q_t, logi.Q_akcja_value_bez_f_rzutujacej, 'Color', color_Alt, 'LineWidth', 1.2);
@@ -140,24 +140,9 @@ if poj_iteracja_uczenia == 1
     xlabel('Time [s]')
     ylabel('Action Value')
     title('Action Value')
-    legend('With projection function', 'Without projection function', 'Location', 'best')
+    legend('With proj', 'Without proj', 'Location', 'best')
 
-    %% Figure 3: Error and Derivative Analysis
-    figure('Position', [150, 150, 1000, 900]);
-
-    subplot(4,1,1)
-    plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
-    hold on
-    plot(logi.Q_t, logi.Ref_y, 'Color', color_Ref, 'LineWidth', 1.2)
-    plot(logi.Q_t, nagroda_y, '|', 'Color', color_Reward, 'MarkerSize', 8)
-    hold off
-    grid on
-    xlabel('Time [s]')
-    ylabel('Output y [%]')
-    title('Process Variable y')
-    legend('Q-controller', 'Reference', 'Reward', 'Location', 'best')
-
-    subplot(4,1,2)
+    subplot(4, 3, 9)
     plot(logi.Q_t, logi.Q_e, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, logi.Ref_e, 'Color', color_Ref, 'LineWidth', 1.2)
@@ -166,10 +151,11 @@ if poj_iteracja_uczenia == 1
     grid on
     xlabel('Time [s]')
     ylabel('Error e [%]')
-    title('Control Error e = SP - y')
-    legend('Q-controller', 'Reference', 'Reward', 'Location', 'best')
+    title('Error e')
+    legend('Q', 'Ref', 'Reward', 'Location', 'best')
 
-    subplot(4,1,3)
+    % Row 4: Derivatives and MNK
+    subplot(4, 3, 10)
     plot(logi.Q_t, logi.Q_de, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, logi.Ref_de, 'Color', color_Ref, 'LineWidth', 1.2)
@@ -178,10 +164,10 @@ if poj_iteracja_uczenia == 1
     grid on
     xlabel('Time [s]')
     ylabel('de [%/s]')
-    title('Error Derivative de/dt')
-    legend('Q-controller', 'Reference', 'Reward', 'Location', 'best')
+    title('Error Derivative')
+    legend('Q', 'Ref', 'Reward', 'Location', 'best')
 
-    subplot(4,1,4)
+    subplot(4, 3, 11)
     plot(logi.Q_t, logi.Q_de2, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, logi.Ref_de2, 'Color', color_Ref, 'LineWidth', 1.2)
@@ -190,14 +176,12 @@ if poj_iteracja_uczenia == 1
     grid on
     xlabel('Time [s]')
     ylabel('de2')
-    title('de2 (Alternative Error Derivative)')
-    legend('Q-controller', 'Reference', 'Reward', 'Location', 'best')
+    title('de2')
+    legend('Q', 'Ref', 'Reward', 'Location', 'best')
 
-    %% Figure 4: MNK Analysis (if available)
+    % MNK Analysis (if available) - use last subplot
     if ~isempty(wsp_mnk)
-        figure('Position', [200, 200, 1000, 900]);
-
-        subplot(4,1,1)
+        subplot(4, 3, 12)
         plot(wek_proc_realizacji, 'Color', color_Q, 'LineWidth', 1.5)
         hold on
         plot(filtr_mnk, 'Color', color_Disturbance, 'LineWidth', 1.5)
@@ -205,30 +189,9 @@ if poj_iteracja_uczenia == 1
         hold off
         grid on
         xlabel('Epoch')
-        ylabel('Normalized Value')
-        title('Learning Progress Metrics')
-        legend('Trajectory realization %', 'MNK filter', 'T_e normalized', 'Location', 'best');
-
-        subplot(4,1,2)
-        plot(wsp_mnk(1,:), 'Color', color_Q, 'LineWidth', 1.5);
-        grid on
-        xlabel('Epoch')
-        ylabel('Coefficient a')
-        title('MNK Coefficient a (Slope)')
-
-        subplot(4,1,3)
-        plot(wsp_mnk(2,:), 'Color', color_Disturbance, 'LineWidth', 1.5);
-        grid on
-        xlabel('Epoch')
-        ylabel('Coefficient b')
-        title('MNK Coefficient b (Intercept)')
-
-        subplot(4,1,4)
-        plot(wsp_mnk(3,:), 'Color', color_Alt, 'LineWidth', 1.5);
-        grid on
-        xlabel('Epoch')
-        ylabel('Coefficient c')
-        title('MNK Coefficient c')
+        ylabel('Normalized')
+        title('Learning Progress')
+        legend('Traj %', 'MNK', 'Te', 'Location', 'best');
     end
 
 %% ========================================================================
@@ -237,10 +200,11 @@ if poj_iteracja_uczenia == 1
 
 else
 
-    %% Figure 1: Output, Control, Disturbance (Q vs PI)
-    figure('Position', [50, 50, 1000, 900]);
+    %% Create single large figure with all plots
+    fig1 = figure('Position', [50, 50, 1600, 1200], 'Name', 'Q vs PI Comparison', 'NumberTitle', 'off');
 
-    subplot(4,1,1)
+    % Row 1: Output and Control
+    subplot(4, 3, 1)
     plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, logi.Ref_y, 'Color', color_Ref, 'LineWidth', 1.2)
@@ -250,10 +214,10 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('Output y [%]')
-    title('Process Variable y - Q vs PI Comparison')
-    legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+    title('Process Variable y')
+    legend('Q', 'Ref', 'Reward', 'PI', 'Location', 'best')
 
-    subplot(4,1,2)
+    subplot(4, 3, 2)
     plot(logi.Q_t, logi.Q_u, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, nagroda_u, '|', 'Color', color_Reward, 'MarkerSize', 8)
@@ -261,39 +225,26 @@ else
     hold off
     grid on
     xlabel('Time [s]')
-    ylabel('Control Signal u [%]')
-    title('Control Signal u - Q vs PI Comparison')
-    legend('Q-controller', 'Reward', 'PI controller', 'Location', 'best')
+    ylabel('Control u [%]')
+    title('Control Signal u')
+    legend('Q', 'Reward', 'PI', 'Location', 'best')
 
-    subplot(4,1,3)
+    subplot(4, 3, 3)
     yyaxis left
     plot(logi.Q_t, logi.Q_u_increment, 'Color', color_Q, 'LineWidth', 1.5);
     hold on
     plot(logi.PID_t, logi.PID_u_increment, 'Color', color_PI, 'LineWidth', 1.5)
     hold off
-    ylabel('Control Increment \Deltau [%]')
+    ylabel('\Deltau [%]')
     yyaxis right
     plot(logi.Q_t, logi.Q_d, 'Color', color_Disturbance, 'LineWidth', 1.5);
-    ylabel('Load Disturbance d [%]')
+    ylabel('Load d [%]')
     grid on
     xlabel('Time [s]')
-    title('Control Increment and Load Disturbance')
-    legend('Q increment', 'PI increment', 'Disturbance d', 'Location', 'best')
+    title('Increment & Disturbance')
 
-    subplot(4,1,4)
-    plot(logi.Q_t, logi.Q_funkcja_rzut, 'Color', color_Q, 'LineWidth', 1.5);
-    hold on
-    yline(0, 'Color', color_Target, 'LineWidth', 1);
-    hold off
-    grid on
-    xlabel('Time [s]')
-    ylabel('Projection Function Value')
-    title('Projection Function (Stability Enhancement)')
-
-    %% Figure 2: State and Action (Q vs PI)
-    figure('Position', [100, 100, 1000, 900]);
-
-    subplot(4,1,1)
+    % Row 2: States
+    subplot(4, 3, 4)
     plot(logi.Q_t, logi.Q_stan_nr, 'Color', color_Q, 'LineWidth', 1.5);
     hold on
     plot(logi.Q_t, logi.Ref_stan_nr, 'Color', color_Ref, 'LineWidth', 1.2);
@@ -304,10 +255,10 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('State Index')
-    title('Discrete State Index - Q vs PI')
-    legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Target state', 'Location', 'best');
+    title('State Index')
+    legend('Q', 'Ref', 'Reward', 'PI', 'Target', 'Location', 'best');
 
-    subplot(4,1,2)
+    subplot(4, 3, 5)
     plot(logi.Q_t, logi.Q_stan_value, 'Color', color_Q, 'LineWidth', 1.5);
     hold on
     plot(logi.Q_t, logi.Ref_stan_value, 'Color', color_Ref, 'LineWidth', 1.2)
@@ -317,10 +268,21 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('State Value')
-    title('Continuous State Value - Q vs PI')
-    legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+    title('State Value')
+    legend('Q', 'Ref', 'Reward', 'PI', 'Location', 'best')
 
-    subplot(4,1,3)
+    subplot(4, 3, 6)
+    plot(logi.Q_t, logi.Q_funkcja_rzut, 'Color', color_Q, 'LineWidth', 1.5);
+    hold on
+    yline(0, 'Color', color_Target, 'LineWidth', 1);
+    hold off
+    grid on
+    xlabel('Time [s]')
+    ylabel('Projection Fn')
+    title('Projection Function')
+
+    % Row 3: Actions and Errors
+    subplot(4, 3, 7)
     plot(logi.Q_t, logi.Q_akcja_nr, 'Color', color_Q, 'LineWidth', 1.5);
     hold on
     plot(logi.PID_t, logi.PID_akcja_nr, 'Color', color_PI, 'LineWidth', 1.5)
@@ -329,10 +291,10 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('Action Index')
-    title('Selected Action Index - Q vs PI')
-    legend('Q action', 'PI action', 'Target action', 'Location', 'best')
+    title('Action Index')
+    legend('Q', 'PI', 'Target', 'Location', 'best')
 
-    subplot(4,1,4)
+    subplot(4, 3, 8)
     plot(logi.Q_t, logi.Q_akcja_value, 'Color', color_Q, 'LineWidth', 1.5);
     hold on
     plot(logi.PID_t, logi.PID_akcja_value, 'Color', color_PI, 'LineWidth', 1.5)
@@ -340,26 +302,10 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('Action Value')
-    title('Action Value - Q vs PI')
-    legend('Q-controller', 'PI controller', 'Location', 'best')
+    title('Action Value')
+    legend('Q', 'PI', 'Location', 'best')
 
-    %% Figure 3: Error and Derivative (Q vs PI)
-    figure('Position', [150, 150, 1000, 900]);
-
-    subplot(4,1,1)
-    plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
-    hold on
-    plot(logi.Q_t, logi.Ref_y, 'Color', color_Ref, 'LineWidth', 1.2)
-    plot(logi.Q_t, nagroda_y, '|', 'Color', color_Reward, 'MarkerSize', 8)
-    plot(logi.PID_t, logi.PID_y, 'Color', color_PI, 'LineWidth', 1.5)
-    hold off
-    grid on
-    xlabel('Time [s]')
-    ylabel('Output y [%]')
-    title('Process Variable y')
-    legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
-
-    subplot(4,1,2)
+    subplot(4, 3, 9)
     plot(logi.Q_t, logi.Q_e, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, logi.Ref_e, 'Color', color_Ref, 'LineWidth', 1.2)
@@ -369,10 +315,11 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('Error e [%]')
-    title('Control Error e = SP - y')
-    legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+    title('Error e')
+    legend('Q', 'Ref', 'Reward', 'PI', 'Location', 'best')
 
-    subplot(4,1,3)
+    % Row 4: Derivatives and MNK
+    subplot(4, 3, 10)
     plot(logi.Q_t, logi.Q_de, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, logi.Ref_de, 'Color', color_Ref, 'LineWidth', 1.2)
@@ -382,10 +329,10 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('de [%/s]')
-    title('Error Derivative de/dt')
-    legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+    title('Error Derivative')
+    legend('Q', 'Ref', 'Reward', 'PI', 'Location', 'best')
 
-    subplot(4,1,4)
+    subplot(4, 3, 11)
     plot(logi.Q_t, logi.Q_de2, 'Color', color_Q, 'LineWidth', 1.5)
     hold on
     plot(logi.Q_t, logi.Ref_de2, 'Color', color_Ref, 'LineWidth', 1.2)
@@ -395,14 +342,12 @@ else
     grid on
     xlabel('Time [s]')
     ylabel('de2')
-    title('de2 (Alternative Error Derivative)')
-    legend('Q-controller', 'Reference', 'Reward', 'PI controller', 'Location', 'best')
+    title('de2')
+    legend('Q', 'Ref', 'Reward', 'PI', 'Location', 'best')
 
-    %% Figure 4: MNK Analysis (if available)
+    % MNK Analysis (if available) - use last subplot
     if ~isempty(wsp_mnk)
-        figure('Position', [200, 200, 1000, 900]);
-
-        subplot(4,1,1)
+        subplot(4, 3, 12)
         plot(wek_proc_realizacji, 'Color', color_Q, 'LineWidth', 1.5)
         hold on
         plot(filtr_mnk, 'Color', color_Disturbance, 'LineWidth', 1.5)
@@ -410,30 +355,9 @@ else
         hold off
         grid on
         xlabel('Epoch')
-        ylabel('Normalized Value')
-        title('Learning Progress Metrics')
-        legend('Trajectory realization %', 'MNK filter', 'T_e normalized', 'Location', 'best');
-
-        subplot(4,1,2)
-        plot(wsp_mnk(1,:), 'Color', color_Q, 'LineWidth', 1.5);
-        grid on
-        xlabel('Epoch')
-        ylabel('Coefficient a')
-        title('MNK Coefficient a (Slope)')
-
-        subplot(4,1,3)
-        plot(wsp_mnk(2,:), 'Color', color_Disturbance, 'LineWidth', 1.5);
-        grid on
-        xlabel('Epoch')
-        ylabel('Coefficient b')
-        title('MNK Coefficient b (Intercept)')
-
-        subplot(4,1,4)
-        plot(wsp_mnk(3,:), 'Color', color_Alt, 'LineWidth', 1.5);
-        grid on
-        xlabel('Epoch')
-        ylabel('Coefficient c')
-        title('MNK Coefficient c')
+        ylabel('Normalized')
+        title('Learning Progress')
+        legend('Traj %', 'MNK', 'Te', 'Location', 'best');
     end
 
 end
