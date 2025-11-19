@@ -417,13 +417,132 @@ Profiling shows the main performance limitations:
 - Python + NumPy for better vectorization
 - Julia for JIT compilation
 
-### Minimal Optimizations Applied
-The codebase includes one critical optimization:
-- **Preallocated `realizacja_traj_epoka` array** in `m_inicjalizacja.m` (line 133)
-- Uses indexed access instead of dynamic growth (`end+1`)
-- Index reset in `m_reset.m` for each epoch
+### Optimizations Applied
 
-**Result**: Marginal improvement (~10% faster) without added complexity
+The codebase includes several critical optimizations:
+
+1. **Preallocated logging arrays** in `m_zapis_logow.m` (2025-11-19):
+   - All 38 logging arrays preallocated to `maksymalna_ilosc_iteracji_uczenia` samples
+   - Uses indexed access (`logi.Q_y(logi_idx) = value`) instead of dynamic growth (`end+1`)
+   - Automatic trimming when episode ends via `trim_logi` flag
+   - **Performance gain**: 10-100x faster logging (O(1) vs O(n²) complexity)
+
+2. **Preallocated trajectory array** in `m_inicjalizacja.m` (line 135):
+   - `realizacja_traj_epoka` preallocated to 20000 samples
+   - Index reset in `m_reset.m` for each epoch
+   - **Performance gain**: ~10% faster overall
+
+3. **Integer conversion safety** (2025-11-19):
+   - All array size calculations wrapped in `round()`:
+     - `max_samples = round(maksymalna_ilosc_iteracji_uczenia)` in m_zapis_logow.m
+     - `maksymalna_ilosc_iteracji_uczenia = round(normrnd(mu, sigma))` in m_reset.m
+     - `round(50 / dt)` and similar in m_inicjalizacja.m
+   - Prevents "Size inputs must be integers" errors from floating-point division
+
+## Code Quality and Recent Improvements
+
+### Visualization System (m_rysuj_wykresy.m)
+
+**Complete refactor** (2025-11-19) consolidating all plotting into a single file:
+
+#### **Theme-Neutral Colors**
+All plots use RGB colors that work on both light and dark MATLAB themes:
+```matlab
+color_Q = 'b';                           % Blue (Q-controller)
+color_Ref = [0.3010 0.7450 0.9330];     % Cyan (Reference trajectory)
+color_PI = [0.1 0.6 0.1];               % Green (PI controller)
+color_Target = [0.5 0.5 0.5];           % Gray (Target/setpoint lines)
+color_Disturbance = [0.8500 0.3250 0.0980];  % Orange-Red
+color_Q_before = [0.3010 0.7450 0.9330];  % Cyan (Q before learning)
+color_Q_after = [1 0 0];                  % Red (Q after learning)
+```
+**Never use 'w' (white) or 'k' (black)** as they become invisible depending on theme.
+
+#### **Tabbed Figure Interface**
+- Use `figure()` without Position parameter to create MATLAB's native tabbed interface
+- **Don't use**: `figure('Position', [x, y, width, height])` - creates separate windows
+- Provides better organization for multiple plots
+
+#### **Plot Organization**
+
+**Single Iteration Mode** (`poj_iteracja_uczenia = 1`):
+- Figure 1: Output, Control, Disturbance, Control Increment (4 subplots)
+- Figure 2: State and Action Information (4 subplots)
+- Figure 3: Error and Derivative Analysis (4 subplots)
+- Figure 4: MNK Analysis if available (4 subplots)
+
+**Verification Mode** (`poj_iteracja_uczenia = 0`):
+- Figures 1-4: Same as single iteration but comparing Q vs PI vs Reference
+- **Figure 5: Main Comparison** (Q-before vs PI vs Q-after Learning):
+  - Shows performance improvement from learning
+  - Includes setpoint reference line
+  - Conditional PI display (only if data exists)
+- **Figure 6: Learning Process Parameters** (4 subplots):
+  - Stabilization percentage per epoch
+  - Learning time per epoch
+  - Q-matrix norm differences (convergence indicator)
+  - Q-matrix norm evolution
+- **Figure 7: Performance Metrics** (5 subplots):
+  - IAE comparison (bar chart)
+  - IAE trajectory over time
+  - Overshoot comparison (bar chart)
+  - Settling time comparison (bar chart)
+  - Trajectory realization percentage
+
+#### **Safe Variable Access**
+All plots check for variable existence:
+```matlab
+if exist('logi_before_learning', 'var') && licz_wskazniki == 0
+    % Comparison plots
+end
+
+if isfield(logi, 'PID_t') && ~isempty(logi.PID_t) && sum(logi.PID_y) > 0
+    plot(logi.PID_t, logi.PID_y, ...)  % Only plot if PI data exists
+end
+```
+
+#### **Dynamic Sizing**
+Never hardcode array dimensions - always use `size()`:
+```matlab
+% WRONG:
+for i=1:99  % Assumes exactly 99 states
+    cc(i) = i;
+end
+
+% CORRECT:
+[n_states, n_actions] = size(Q_2d);
+for i = 1:n_states
+    policy_matrix(i, best_action_idx(i)) = 1;
+end
+```
+
+### Verification Experiment Flow
+
+The verification workflow in `main.m` (lines 69-74):
+```matlab
+if poj_iteracja_uczenia == 0
+    m_eksperyment_weryfikacyjny  % Run verification
+    m_rysuj_wykresy              % Generate comparison plots
+    figure()
+    mesh(Q_2d)                    % Show final Q-matrix
+end
+```
+
+**Data Storage**:
+- First verification run (before learning): stores `logi_before_learning`
+- Second verification run (after learning): uses current `logi`
+- Both datasets plotted together for comparison
+
+### Code Architecture Principles
+
+1. **Preallocate all arrays**: Never use dynamic growth with `end+1`
+2. **Use indexed access**: Maintain index counters (`logi_idx`, `realizacja_traj_epoka_idx`)
+3. **Trim when done**: Use flags like `trim_logi` to reduce arrays to actual size
+4. **Integer-safe math**: Wrap all size calculations in `round()`
+5. **Theme-neutral colors**: Always use RGB arrays, never 'w' or 'k'
+6. **Check before use**: Use `exist()`, `isfield()`, `~isempty()` before accessing variables
+7. **Dynamic sizing**: Use `size()`, `length()` instead of hardcoded dimensions
+8. **Tabbed figures**: Use `figure()` for better UI organization
 
 ## Research Publications
 

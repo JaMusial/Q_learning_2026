@@ -29,8 +29,6 @@ else
     m_reset
 end
 
-return
-
 tic
 eps = eps_ini;
 uczenie = 1;
@@ -70,7 +68,7 @@ m_rysuj_wykresy
 
 if poj_iteracja_uczenia == 0
     m_eksperyment_weryfikacyjny
+    m_rysuj_wykresy  % Show comparison plots after verification
     figure()
     mesh(Q_2d)
-    figure(300)
 end

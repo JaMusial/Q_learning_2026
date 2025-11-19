@@ -1,7 +1,7 @@
 %% Simulation parameters
 gif_on = 0;
 poj_iteracja_uczenia = 0;
-max_epoki = 100;
+max_epoki = 300;
 oczekiwana_ilosc_probek_stabulizacji = 20;
 reakcja_na_T0 = 0;
 maksymalna_ilosc_iteracji_uczenia = 4000;
@@ -63,7 +63,7 @@ rozmiar_okna_sredniej_realizacji = 5;
 
 SP_ini = 50;
 k = 1;
-T0 = 2;
+T0 = 0;
 dodatkowe_probki_reka = 5;
 
 % Selected model: Third order pneumatic system

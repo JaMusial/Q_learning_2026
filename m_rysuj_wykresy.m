@@ -21,6 +21,8 @@ color_Target = [0.5 0.5 0.5];           % Gray (Target lines)
 color_Disturbance = [0.8500 0.3250 0.0980];  % Orange-Red (Disturbances)
 color_Alt = [0.4660 0.6740 0.1880];     % Yellow-Green (Alternative plots)
 color_Purple = [0.4940 0.1840 0.5560];  % Purple (Te normalized)
+color_Q_before = [0.3010 0.7450 0.9330];  % Cyan (Q before learning)
+color_Q_after = [1 0 0];                  % Red (Q after learning)
 
 % Prepare reward markers (set zeros to NaN for cleaner visualization)
 nagroda_y = logi.Q_y .* logi.Q_R;
@@ -45,7 +47,7 @@ nagroda_stan_nr(nagroda_stan_nr==0) = NaN;
 if poj_iteracja_uczenia == 1
 
     %% Figure 1: Output, Control, Disturbance, Control Increment
-    figure('Position', [50, 50, 1000, 900]);
+    figure()
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
@@ -93,7 +95,7 @@ if poj_iteracja_uczenia == 1
     title('Control Signal Increment \Deltau')
 
     %% Figure 2: State and Action Information
-    figure('Position', [100, 100, 1000, 900]);
+    figure()
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_stan_nr, 'Color', color_Q, 'LineWidth', 1.5);
@@ -143,7 +145,7 @@ if poj_iteracja_uczenia == 1
     legend('With projection function', 'Without projection function', 'Location', 'best')
 
     %% Figure 3: Error and Derivative Analysis
-    figure('Position', [150, 150, 1000, 900]);
+    figure()
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
@@ -195,7 +197,7 @@ if poj_iteracja_uczenia == 1
 
     %% Figure 4: MNK Analysis (if available)
     if ~isempty(wsp_mnk)
-        figure('Position', [200, 200, 1000, 900]);
+        figure()
 
         subplot(4,1,1)
         plot(wek_proc_realizacji, 'Color', color_Q, 'LineWidth', 1.5)
@@ -238,7 +240,7 @@ if poj_iteracja_uczenia == 1
 else
 
     %% Figure 1: Output, Control, Disturbance (Q vs PI)
-    figure('Position', [50, 50, 1000, 900]);
+    figure()
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
@@ -291,7 +293,7 @@ else
     title('Projection Function (Stability Enhancement)')
 
     %% Figure 2: State and Action (Q vs PI)
-    figure('Position', [100, 100, 1000, 900]);
+    figure()
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_stan_nr, 'Color', color_Q, 'LineWidth', 1.5);
@@ -344,7 +346,7 @@ else
     legend('Q-controller', 'PI controller', 'Location', 'best')
 
     %% Figure 3: Error and Derivative (Q vs PI)
-    figure('Position', [150, 150, 1000, 900]);
+    figure()
 
     subplot(4,1,1)
     plot(logi.Q_t, logi.Q_y, 'Color', color_Q, 'LineWidth', 1.5)
@@ -400,7 +402,7 @@ else
 
     %% Figure 4: MNK Analysis (if available)
     if ~isempty(wsp_mnk)
-        figure('Position', [200, 200, 1000, 900]);
+        figure()
 
         subplot(4,1,1)
         plot(wek_proc_realizacji, 'Color', color_Q, 'LineWidth', 1.5)
@@ -434,6 +436,188 @@ else
         xlabel('Epoch')
         ylabel('Coefficient c')
         title('MNK Coefficient c')
+    end
+
+    %% ====================================================================
+    %%  VERIFICATION: Q-before vs PI vs Q-after Learning Comparison
+    %% ====================================================================
+
+    if exist('logi_before_learning', 'var') && licz_wskazniki == 0
+        figure()
+
+        subplot(2,1,1)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_y, 'Color', color_Q_before, 'LineWidth', 1.5)
+        hold on
+        if isfield(logi, 'PID_t') && ~isempty(logi.PID_t) && sum(logi.PID_y) > 0
+            plot(logi.PID_t, logi.PID_y, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        plot(logi.Q_t, logi.Q_y, 'Color', color_Q_after, 'LineWidth', 1.5)
+        yline(SP_ini, '--', 'Color', color_Target, 'LineWidth', 1.5)
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('Output y [%]')
+        title('Process Variable y - Comparison: Q-before vs PI vs Q-after Learning')
+        if isfield(logi, 'PID_t') && ~isempty(logi.PID_t) && sum(logi.PID_y) > 0
+            legend('Q-learning (before)', 'PI controller', 'Q-learning (after)', 'Setpoint', 'Location', 'best')
+        else
+            legend('Q-learning (before)', 'Q-learning (after)', 'Setpoint', 'Location', 'best')
+        end
+
+        subplot(2,1,2)
+        plot(logi_before_learning.Q_t, logi_before_learning.Q_u, 'Color', color_Q_before, 'LineWidth', 1.5)
+        hold on
+        if isfield(logi, 'PID_t') && ~isempty(logi.PID_t) && sum(logi.PID_u) > 0
+            plot(logi.PID_t, logi.PID_u, 'Color', color_PI, 'LineWidth', 1.5)
+        end
+        plot(logi.Q_t, logi.Q_u, 'Color', color_Q_after, 'LineWidth', 1.5)
+        hold off
+        grid on
+        xlabel('Time [s]')
+        ylabel('Control Signal u [%]')
+        title('Control Signal u - Comparison: Q-before vs PI vs Q-after Learning')
+        if isfield(logi, 'PID_t') && ~isempty(logi.PID_t) && sum(logi.PID_u) > 0
+            legend('Q-learning (before)', 'PI controller', 'Q-learning (after)', 'Location', 'best')
+        else
+            legend('Q-learning (before)', 'Q-learning (after)', 'Location', 'best')
+        end
+    end
+
+    %% ====================================================================
+    %%  LEARNING PROCESS PARAMETERS
+    %% ====================================================================
+
+    if exist('inf_zakonczono_epoke_stabil_old', 'var') && exist('czas_uczenia_calkowity', 'var')
+        figure()
+
+        % Percent stabilization per epoch
+        subplot(4,1,1)
+        if exist('proc_stabil_per_epoch', 'var') && ~isempty(proc_stabil_per_epoch)
+            plot(proc_stabil_per_epoch, 'Color', color_Q, 'LineWidth', 1.5)
+            grid on
+            xlabel('Epoch Group')
+            ylabel('Stabilization [%]')
+            title('Percentage of Epochs Ending in Stabilization')
+        else
+            % Calculate from available data if vector doesn't exist
+            total_epochs = epoka - 1;
+            if total_epochs > 0
+                stabil_percent = (inf_zakonczono_epoke_stabil / total_epochs) * 100;
+                bar(stabil_percent, 'FaceColor', color_Q)
+                grid on
+                ylabel('Stabilization [%]')
+                title(sprintf('Stabilization: %.1f%% (%d/%d epochs)', ...
+                    stabil_percent, inf_zakonczono_epoke_stabil, total_epochs))
+            end
+        end
+
+        % Learning time per epoch
+        subplot(4,1,2)
+        if exist('learning_time_per_epoch', 'var') && ~isempty(learning_time_per_epoch)
+            plot(learning_time_per_epoch, 'Color', color_Disturbance, 'LineWidth', 1.5)
+            grid on
+            xlabel('Epoch Group')
+            ylabel('Time [s]')
+            title('Learning Time per Epoch')
+        else
+            % Show total learning time
+            bar(czas_uczenia_calkowity, 'FaceColor', color_Disturbance)
+            grid on
+            ylabel('Time [s]')
+            title(sprintf('Total Learning Time: %.2f s', czas_uczenia_calkowity))
+        end
+
+        % Q-matrix norm differences
+        subplot(4,1,3)
+        if exist('max_macierzy_Q', 'var') && length(max_macierzy_Q) > 1
+            % Plot differences between consecutive samples
+            norm_diff = diff(max_macierzy_Q);
+            plot(norm_diff, 'Color', color_Alt, 'LineWidth', 1.5)
+            grid on
+            xlabel('Sample')
+            ylabel('\Delta||Q||')
+            title('Q-matrix Norm Differences (Convergence Indicator)')
+        end
+
+        % Max Q-values over time
+        subplot(4,1,4)
+        if exist('max_macierzy_Q', 'var') && ~isempty(max_macierzy_Q)
+            plot(max_macierzy_Q, 'Color', color_Purple, 'LineWidth', 1.5)
+            grid on
+            xlabel('Sample')
+            ylabel('||Q||')
+            title('Q-matrix Norm Evolution')
+        end
+    end
+
+    %% ====================================================================
+    %%  PERFORMANCE METRICS
+    %% ====================================================================
+
+    if exist('IAE_wek', 'var') && ~isempty(IAE_wek)
+        figure()
+
+        % IAE comparison
+        subplot(5,1,1)
+        if length(IAE_wek) >= 2
+            bar_data = [IAE_wek(1), IAE_wek(2)];  % PI, Q-learning
+            bar_colors = [color_PI; color_Q_after];
+            b = bar(bar_data);
+            b.FaceColor = 'flat';
+            b.CData = bar_colors;
+            grid on
+            ylabel('IAE')
+            title('Integral Absolute Error (IAE) Comparison')
+            set(gca, 'XTickLabel', {'PI', 'Q-learning'})
+        end
+
+        % IAE trajectory (if available)
+        subplot(5,1,2)
+        if exist('IAE_traj_wek', 'var') && ~isempty(IAE_traj_wek)
+            plot(IAE_traj_wek, 'Color', color_Q, 'LineWidth', 1.5)
+            grid on
+            xlabel('Sample')
+            ylabel('IAE')
+            title('IAE Trajectory Over Time')
+        end
+
+        % Overshoot comparison
+        subplot(5,1,3)
+        if exist('maks_przereg_wek', 'var') && length(maks_przereg_wek) >= 2
+            bar_data = [maks_przereg_wek(1), maks_przereg_wek(2)];
+            bar_colors = [color_PI; color_Q_after];
+            b = bar(bar_data);
+            b.FaceColor = 'flat';
+            b.CData = bar_colors;
+            grid on
+            ylabel('Overshoot [%]')
+            title('Maximum Overshoot Comparison')
+            set(gca, 'XTickLabel', {'PI', 'Q-learning'})
+        end
+
+        % Settling time comparison
+        subplot(5,1,4)
+        if exist('czas_regulacji_wek', 'var') && length(czas_regulacji_wek) >= 2
+            bar_data = [czas_regulacji_wek(1), czas_regulacji_wek(2)];
+            bar_colors = [color_PI; color_Q_after];
+            b = bar(bar_data);
+            b.FaceColor = 'flat';
+            b.CData = bar_colors;
+            grid on
+            ylabel('Settling Time [s]')
+            title('Settling Time Comparison')
+            set(gca, 'XTickLabel', {'PI', 'Q-learning'})
+        end
+
+        % Trajectory realization percentage
+        subplot(5,1,5)
+        if exist('proc_realizacji_traj', 'var') && ~isempty(proc_realizacji_traj)
+            plot(proc_realizacji_traj, 'Color', color_Purple, 'LineWidth', 1.5)
+            grid on
+            xlabel('Sample')
+            ylabel('Realization [%]')
+            title('Trajectory Realization Percentage')
+        end
     end
 
 end

@@ -1,0 +1,93 @@
+========================================
+  DEAD TIME IMPLEMENTATION TEST
+========================================
+
+TEST 1: f_bufor() Function Verification
+----------------------------------------
+  ✓ PASSED: f_bufor() operates correctly
+    - Filling phase: 200 zeros output
+    - Steady state: Output = Input delayed by 2.00 seconds
+
+TEST 2: Step Response with Dead Time
+----------------------------------------
+Testing Model 1 (Order: 1, T=5, k=1.000)
+  Response start times (5% threshold):
+    T0=0.0s: Response at t=5.25s (expected: 5.00s, error: 0.250s) ✗
+    T0=1.0s: Response at t=6.25s (expected: 6.00s, error: 0.250s) ✗
+    T0=2.0s: Response at t=7.25s (expected: 7.00s, error: 0.250s) ✗
+    T0=3.0s: Response at t=8.25s (expected: 8.00s, error: 0.250s) ✗
+    T0=5.0s: Response at t=10.25s (expected: 10.00s, error: 0.250s) ✗
+  ✗ FAILED: Some timing errors detected
+
+Testing Model 3 (Order: 2, T=[5 2], k=1.000)
+  Response start times (5% threshold):
+    T0=0.0s: Response at t=6.13s (expected: 5.00s, error: 1.130s) ✗
+    T0=1.0s: Response at t=7.13s (expected: 6.00s, error: 1.130s) ✗
+    T0=2.0s: Response at t=8.13s (expected: 7.00s, error: 1.130s) ✗
+    T0=3.0s: Response at t=9.13s (expected: 8.00s, error: 1.130s) ✗
+    T0=5.0s: Response at t=11.13s (expected: 10.00s, error: 1.130s) ✗
+  ✗ FAILED: Some timing errors detected
+
+Testing Model 5 (Order: 3, T=[2.34 1.55 9.38], k=1.000)
+  Response start times (5% threshold):
+    T0=0.0s: Response at t=7.79s (expected: 5.00s, error: 2.790s) ✗
+    T0=1.0s: Response at t=8.79s (expected: 6.00s, error: 2.790s) ✗
+    T0=2.0s: Response at t=9.79s (expected: 7.00s, error: 2.790s) ✗
+    T0=3.0s: Response at t=10.79s (expected: 8.00s, error: 2.790s) ✗
+    T0=5.0s: Response at t=12.79s (expected: 10.00s, error: 2.790s) ✗
+  ✗ FAILED: Some timing errors detected
+
+Testing Model 8 (Order: 3, T=[2.34 1.55 9.38], k=0.386)
+  Response start times (5% threshold):
+    T0=0.0s: Response at t=6.86s (expected: 5.00s, error: 1.860s) ✗
+    T0=1.0s: Response at t=7.86s (expected: 6.00s, error: 1.860s) ✗
+    T0=2.0s: Response at t=8.86s (expected: 7.00s, error: 1.860s) ✗
+    T0=3.0s: Response at t=9.86s (expected: 8.00s, error: 1.860s) ✗
+    T0=5.0s: Response at t=11.86s (expected: 10.00s, error: 1.860s) ✗
+  ✗ FAILED: Some timing errors detected
+
+TEST 3: Response Shape Comparison
+----------------------------------------
+Verifying that T0>0 response matches T0=0 response shifted by T0...
+
+Model 1:
+  T0=1.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=2.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=3.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=5.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  ✓ PASSED: Response shapes match (just time-shifted)
+
+Model 3:
+  T0=1.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=2.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=3.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=5.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  ✓ PASSED: Response shapes match (just time-shifted)
+
+Model 5:
+  T0=1.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=2.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=3.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=5.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  ✓ PASSED: Response shapes match (just time-shifted)
+
+Model 8:
+  T0=1.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=2.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=3.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  T0=5.0s vs T0=0 shifted: RMS diff = 0.0000% ✓
+  ✓ PASSED: Response shapes match (just time-shifted)
+
+========================================
+  TEST SUMMARY
+========================================
+Model 1: ✗ FAILED
+Model 3: ✗ FAILED
+Model 5: ✗ FAILED
+Model 8: ✗ FAILED
+
+✗ SOME TESTS FAILED
+Please review the results and fix any issues.
+
+Figures saved for visual inspection.
+Check that responses are cleanly time-shifted by T0.
