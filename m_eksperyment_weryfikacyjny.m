@@ -8,9 +8,9 @@ reset_logi=1;
 zapis_logi_PID=1;
 eks_wer=1;
 d=0;
-ilosc_probek_sterowanie_reczne=T0/dt + dodatkowe_probki_reka;
+ilosc_probek_sterowanie_reczne = round(T0/dt) + dodatkowe_probki_reka;
 
-dlugosc_symulacji=czas_eksp_wer/dt+ilosc_probek_sterowanie_reczne;
+dlugosc_symulacji = round(czas_eksp_wer/dt) + ilosc_probek_sterowanie_reczne;
 for iter_test=1:dlugosc_symulacji
     if iter_test==15+ilosc_probek_sterowanie_reczne
         SP=SP_ini;

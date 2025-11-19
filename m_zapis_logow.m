@@ -10,7 +10,8 @@
 
 if reset_logi==1 || exist('logi','var') == 0
     % Preallocate arrays to maximum iteration size for performance
-    max_samples = maksymalna_ilosc_iteracji_uczenia;
+    % Round to integer since normrnd() can return float values
+    max_samples = round(maksymalna_ilosc_iteracji_uczenia);
 
     % Q-controller logs
     logi.Q_e = zeros(1, max_samples);

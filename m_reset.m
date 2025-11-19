@@ -13,7 +13,7 @@ if uczenie_obciazeniowe == 1 && uczenie_zmiana_SP == 0
     mu = 3000;
     sigma = zakres_losowania_czas / 2;
 
-    maksymalna_ilosc_iteracji_uczenia = normrnd(mu, sigma);
+    maksymalna_ilosc_iteracji_uczenia = round(normrnd(mu, sigma));
     if maksymalna_ilosc_iteracji_uczenia < 10
         maksymalna_ilosc_iteracji_uczenia = 10;
     end

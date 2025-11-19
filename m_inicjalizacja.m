@@ -46,8 +46,8 @@ max_powtorzen_losowania = 10;
 kQ = Kp;
 
 % Trajectory realization percentage
-ilosc_probek_procent_realizacjii = 50 / dt;
-przesuniecie_okno_procent_realizacji = ilosc_probek_procent_realizacjii / 4;
+ilosc_probek_procent_realizacjii = round(50 / dt);
+przesuniecie_okno_procent_realizacji = round(ilosc_probek_procent_realizacjii / 4);
 rozmiar_okna_sredniej_realizacji = 5;
 
 %% Plant (process) parameters
