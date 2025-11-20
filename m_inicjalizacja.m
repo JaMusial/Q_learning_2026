@@ -1,7 +1,7 @@
 %% Simulation parameters
 gif_on = 0;
 poj_iteracja_uczenia = 0;
-max_epoki = 200;
+max_epoki = 1;
 oczekiwana_ilosc_probek_stabulizacji = 20;
 maksymalna_ilosc_iteracji_uczenia = 4000;
 uczenie_obciazeniowe = 1;
@@ -62,13 +62,14 @@ rozmiar_okna_sredniej_realizacji = 5;
 
 SP_ini = 50;
 k = 1;
-T0 = 1;          % Actual plant dead time (physical reality)
-T0_controller = 1;  % Dead time controller uses for compensation (0 = no compensation)
+T0 = 0;          % Actual plant dead time (physical reality)
+T0_controller = T0;  % Dead time controller uses for compensation (0 = no compensation)
 dodatkowe_probki_reka = 5;
 
 % Selected model: Third order pneumatic system
 T = [2.34 1.55 9.38];
-nr_modelu = 3;
+T= [5 2 2];
+nr_modelu = 1;
 Ks = tf(0.994, [T(1) 1]) * tf(0.968, [T(2) 1]) * tf(0.4, [T(3) 1]);
 
 % Initialize plant delay buffers (actual physical dead time)
