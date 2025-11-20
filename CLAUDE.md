@@ -268,7 +268,9 @@ T = [5 2]; nr_modelu = 3; Ks = tf(1,[5 1])*tf(1,[2 1]);
 
 `f_skalowanie(max_in, min_in, max_out, min_out, value)` for bidirectional conversion:
 - **Process ranges**: Error [-100,+100]%, Output [0,100]%, Control [0,100]%
-- **Normalized**: Error [-1,+1], Output [0,1], Control [0,2] (allows 200% authority)
+- **Normalized**: Error [-1,+1], Output [0,1], Control [0,1]
+
+**Important**: Plant gain `k` is defined in process units and used directly in f_obiekt (which operates in normalized space). This requires symmetric u/y scaling (wart_max_u = wart_max_y = 1) to maintain correct steady-state relationships. If asymmetric scaling is needed (e.g., wart_max_u=2 for 200% authority), gain must be adjusted: k_norm = k × (wart_max_y/wart_max_u).
 
 ## Design Insights
 

@@ -36,9 +36,11 @@ d=0;
 ilosc_probek_sterowanie_reczne = round(T0/dt) + dodatkowe_probki_reka;
 
 % Reset plant delay buffers for clean verification test
+% Pre-fill with steady-state value to prevent transient
 if T0 ~= 0
-    bufor_T0 = zeros(1, round(T0/dt));
-    bufor_T0_PID = zeros(1, round(T0/dt));
+    u_ss_scaled = f_skalowanie(proc_max_u, proc_min_u, wart_max_u, wart_min_u, SP/k);
+    bufor_T0 = ones(1, round(T0/dt)) * u_ss_scaled;
+    bufor_T0_PID = ones(1, round(T0/dt)) * u_ss_scaled;
 end
 
 % Reset controller compensation buffers for clean verification test
