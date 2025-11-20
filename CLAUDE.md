@@ -52,9 +52,116 @@ Guidance for Claude Code when working with this Q2d Q-learning controller reposi
 
 **Key Features**:
 - Projection function: `e·(1/Te - 1/Ti)` for stability (optional)
-- Dead time: External delay buffers (T0 > 0)
+- Dead time: Decoupled plant delay (T0) and controller compensation (T0_controller)
 - Reference trajectory: Uses Te_bazowe (goal) for consistent visualization
 - Learning disabled when control saturates
+
+## Dead Time Compensation
+
+**Design Philosophy**: Decouple physical plant delay from controller compensation strategy to enable robustness research.
+
+### Two Independent Parameters
+
+**T0** (Plant Dead Time):
+- Physical dead time in the plant/process
+- Control signal u(t) affects plant output at t+T0
+- Always applied via `bufor_T0` before plant simulation
+- Represents reality
+
+**T0_controller** (Controller Compensation):
+- Dead time value the controller uses for compensation
+- Set to 0: No compensation (controller ignores dead time)
+- Set to T0: Perfect matched compensation
+- Set to ≠T0: Mismatched compensation (research scenarios)
+
+### Delayed Credit Assignment (T0_controller > 0)
+
+**Core Strategy**: Buffer state-action pairs and wait for action's effect to propagate before updating Q-values.
+
+**Timing Logic** (at iteration k):
+1. Observe state s(k) calculated from y(k)
+2. Select action a(k) based on s(k)
+3. Buffer s(k) and a(k) in FIFO buffers (size T0_controller/dt)
+4. Retrieve s(k-T0_controller/dt) and a(k-T0_controller/dt) from buffers
+5. Update: `Q(s(k-T0_controller/dt), a(k-T0_controller/dt))` using s(k) as next state
+
+**Why this works when T0 = T0_controller**:
+- Action a(k) generates u(k)
+- u(k) enters plant delay buffer (T0)
+- At k+T0/dt+1: y reflects u(k), therefore s(k+T0/dt+1) reflects a(k)
+- Buffer retrieves (s(k), a(k)) at iteration k+T0/dt+1
+- Q-update credits a(k) with consequence s(k+T0/dt+1) ✓
+
+**Code Implementation** (m_regulator_Q.m:86-105):
+```matlab
+if T0_controller > 0
+    % Buffer current state/action for delayed credit assignment
+    [old_stan_T0, bufor_state] = f_bufor(stan, bufor_state);
+    [wyb_akcja_T0, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);
+
+    % Use CURRENT state as next state (effect visible now)
+    stan_T0 = stan;
+
+    % Reward buffered state if it was in goal state
+    if old_stan_T0 == nr_stanu_doc
+        R = 1;
+    else
+        R = 0;
+    end
+else
+    % No compensation: standard one-step Q-learning
+    old_stan_T0 = old_state;
+    stan_T0 = stan;
+    wyb_akcja_T0 = wyb_akcja;
+end
+```
+
+### Sparse Reward Strategy
+
+**Critical Design Choice**: R=1 **ONLY** at goal state (nr_stanu_doc)
+
+**Rationale**:
+- Goal state forces goal action (a=0, zero control increment)
+- Q(goal_state, goal_action) receives direct reward
+- All other Q-values learned via bootstrapping: γ·max(Q(s',·))
+- Ensures Q(goal_state, goal_action) = highest value in Q-table
+- Controller cannot select goal_action unless in goal_state
+
+This sparse reward requires proper credit assignment - dead time compensation ensures actions are credited when their effects are actually observed.
+
+### Buffer Pre-filling (Manual Control)
+
+During manual control phase (first 5 samples):
+- Plant buffers (`bufor_T0`, `bufor_T0_PID`) pre-filled with u=SP/k (steady-state)
+- Controller buffers (`bufor_state`, `bufor_wyb_akcja`) filled but outputs discarded
+- Prevents transient from zero-filled buffers
+- Simulates system already at steady-state before controller engages
+
+### Research Scenarios
+
+**Matched Compensation** (T0=3, T0_controller=3):
+- Optimal: controller waits full dead time before crediting actions
+
+**No Compensation** (T0=3, T0_controller=0):
+- Controller learns delayed policy without explicit compensation
+- Tests if Q-learning can handle dead time implicitly
+
+**Under-Compensation** (T0=3, T0_controller=2):
+- Controller underestimates dead time
+- Credits actions too early
+- Tests robustness
+
+**Over-Compensation** (T0=3, T0_controller=4):
+- Controller overestimates dead time
+- Credits actions too late
+- Tests robustness
+
+### Continuous Learning Mode
+
+**Important**: Buffers are NOT reset between learning episodes:
+- Episodes are artificial boundaries for convergence checking
+- Buffers retain values to simulate continuous industrial operation
+- Only reset at start of verification experiment (clean test)
 
 ## Architecture
 
@@ -95,7 +202,8 @@ Verification → Visualization
 | `nr_modelu` | 1-8 | Model selection (1=1st order, 8=3rd order pneumatic) |
 | `T` | varies | Time constant(s) [s] |
 | `k` | varies | Process gain |
-| `T0` | 0 | Dead time [s] |
+| `T0` | 0 | Plant dead time (physical reality) [s] |
+| `T0_controller` | 0 | Controller compensation dead time [s] (0=no compensation) |
 
 ## Plant Models (f_obiekt.m)
 
