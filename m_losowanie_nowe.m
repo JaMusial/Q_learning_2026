@@ -1,4 +1,4 @@
-[Q_value,wyb_akcja]=f_best_action_in_state(Q_2d, stan, nr_stanu_doc);
+[Q_value,wyb_akcja]=f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
 
 if wyb_akcja_above < wyb_akcja_under
     min_losowanie = wyb_akcja_under - RD;

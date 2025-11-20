@@ -3,7 +3,6 @@ function [stany, akcje, no_of_states, no_of_actions, state_doc, action_doc] =...
 format long
 gorne_ograniczenie=gorne_ograniczenie/(Kp*dt);
 ilosc_akcji=floor(oczekiwana_ilosc_stanow/2);
-tttest = precision*2/Te;
 akcje=[0 precision*2/Te];
 
 % p=log(Te) / log(model_kompensatora(1)) - model_kompensatora(2);

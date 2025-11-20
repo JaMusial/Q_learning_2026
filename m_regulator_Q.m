@@ -123,13 +123,13 @@ end
 if stan + 1 > ilosc_stanow
     wyb_akcja_above = wyb_akcja;
 else
-    [Q_value_state_above, wyb_akcja_above] = f_best_action_in_state(Q_2d, stan+1, nr_stanu_doc);
+    [Q_value_state_above, wyb_akcja_above] = f_best_action_in_state(Q_2d, stan+1, nr_akcji_doc);
 end
 
 if stan - 1 < 1
     wyb_akcja_under = wyb_akcja;
 else
-    [Q_value_state_under, wyb_akcja_under] = f_best_action_in_state(Q_2d, stan-1, nr_stanu_doc);
+    [Q_value_state_under, wyb_akcja_under] = f_best_action_in_state(Q_2d, stan-1, nr_akcji_doc);
 end
 
 % If in target state, select target action
@@ -152,7 +152,7 @@ else
         end
 
         if ponowne_losowanie >= max_powtorzen_losowania_RD
-            [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_stanu_doc);
+            [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
         end
 
         wart_akcji = akcje_sr(wyb_akcja);
@@ -161,7 +161,7 @@ else
 
     elseif stan ~= 0
         % Exploitation: Select best action
-        [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_stanu_doc);
+        [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
         wart_akcji = akcje_sr(wyb_akcja);
         uczenie = 0;
         czy_losowanie = 0;

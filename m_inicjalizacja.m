@@ -69,7 +69,7 @@ dodatkowe_probki_reka = 5;
 % Selected model: Third order pneumatic system
 T = [2.34 1.55 9.38];
 % T= [5 2 2];
-nr_modelu = 8;
+nr_modelu = 1;
 Ks = tf(0.994, [T(1) 1]) * tf(0.968, [T(2) 1]) * tf(0.4, [T(3) 1]);
 
 % Initialize plant delay buffers (actual physical dead time)
@@ -95,11 +95,11 @@ proc_max_u = 100;
 proc_min_u = 0;
 
 % Normalized ranges (for internal calculations)
-wart_max_e = 1;
-wart_min_e = -1;
-wart_max_y = 1;
+wart_max_e = 2;
+wart_min_e = -2;
+wart_max_y = 2;
 wart_min_y = 0;
-wart_max_u = 1;
+wart_max_u = 2;
 wart_min_u = 0;
 
 %% Helper variables
