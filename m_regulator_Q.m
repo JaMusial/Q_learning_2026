@@ -84,10 +84,13 @@ else
     stan = f_find_state(stan_value, stany);
 
     if T0_controller > 0
-        [stan_T0, bufor_state] = f_bufor(stan, bufor_state);
-        [old_stan_T0, bufor_old_state] = f_bufor(old_state, bufor_old_state);
+        % Buffer current state and action for delayed credit assignment
+        [old_stan_T0, bufor_state] = f_bufor(stan, bufor_state);
         [wyb_akcja_T0, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);
         [uczenie_T0, bufor_uczenie] = f_bufor(uczenie, bufor_uczenie);
+
+        % Use CURRENT state as next state (effect is visible now)
+        stan_T0 = stan;
 
         if old_stan_T0 == nr_stanu_doc
             R = 1;
