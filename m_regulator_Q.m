@@ -44,9 +44,10 @@ if iter <= ilosc_probek_sterowanie_reczne
     uczenie = 0;
     czy_losowanie = 0;
 
+    % Fill buffers during manual control but don't use buffered output (initially zeros)
     if T0_controller > 0
-        [stan, bufor_state] = f_bufor(stan, bufor_state);
-        [wyb_akcja, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);
+        [~, bufor_state] = f_bufor(stan, bufor_state);
+        [~, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);
     end
 
     stan_value_ref = de_ref + 1/Te * e_ref;
