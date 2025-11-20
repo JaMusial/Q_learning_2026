@@ -10,7 +10,7 @@ u_old = u;
 
 %% Manual control (initial samples)
 if iter <= ilosc_probek_sterowanie_reczne
-    u = y / k;
+    u = SP / k;
     e = SP - y;
     de = 0;
     de2 = 0;
@@ -66,12 +66,9 @@ else
     d_ref = d * 100;
     e_ref_s = e_ref;
 
-    if d_ref_s ~= d_ref
-        e_ref = SP - y_ref - (d_ref - d_ref_s) / 2;
-    else
-        e_ref = SP - y_ref;
-    end
-
+    % Reference trajectory follows ideal first-order dynamics toward setpoint
+    % (disturbances are not modeled - they cause deviations that controllers must reject)
+    e_ref = SP - y_ref;
     e_ref = (Te_bazowe - dt) / Te_bazowe * e_ref;
     de_ref_s = de_ref;
     de_ref = (e_ref - e_ref_s) / dt;

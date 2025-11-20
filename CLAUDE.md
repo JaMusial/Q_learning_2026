@@ -1,583 +1,189 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code when working with this Q2d Q-learning controller repository.
 
-## Research Context and Motivation
+## Research Context
 
-### The Industrial Problem
-**60% of industrial PID control loops perform poorly** due to inadequate tuning. Retuning requires expert knowledge, experimental data, and is often impractical in factories with hundreds of simultaneous control loops. This research develops a **self-improving Q-learning controller** that can:
-- **Bumplessly replace** existing poorly-tuned PI controllers
-- **Start with similar performance** to the existing controller
-- **Gradually improve online** through reinforcement learning during normal operation
-- Work **without any process model** or knowledge of process dynamics
+**Problem**: 60% of industrial PID loops perform poorly. Retuning requires expert knowledge and is impractical at scale.
 
-### Research Evolution: Q3d → Q2d → Q2dPLC
+**Solution**: Self-improving Q-learning controller that:
+- Bumplessly replaces existing PI controllers
+- Starts with similar performance (Te=Ti, K_Q=K_PI, Q-matrix as identity)
+- Gradually improves online through reinforcement learning
+- Requires no process model (only existing PI tunings)
 
-#### **Q3d (Initial Approach - Abandoned)**
-- Used **3-dimensional Q-matrix** with separate state spaces for error `e` and derivative `de`
-- **Problems**: Extremely slow learning, large memory requirements, too many tuning parameters
-- **Not practical** for industrial PLC implementation
+### Q2d Breakthrough
 
-#### **Q2d (Current Implementation - This Codebase)**
-The breakthrough came from **merging error and derivative into a single state** based on the **first-order target trajectory**:
+**Key Innovation**: Merge error and derivative into single state based on first-order trajectory:
+- **Target trajectory**: `ė + (1/Te)·e = 0` → `e(t) = e₀·exp(-t/Te)`
+- **State definition**: `s = ė + (1/Te)·e` (when s≈0, system on trajectory)
+- **Control law**: `U(t) = U(t-1) + K_Q·Ts·a(s)` where action `a(s)` from Q-matrix
 
-**Target Trajectory**: `F(e,ė) = e + (1/Te)·e = 0`
+**Staged Learning**: Te reduces from Ti (20s) → Te_goal (2s) in 0.1s steps
+- Q-matrix preserved across Te changes
+- Small steps allow gradual adaptation without catastrophic forgetting
+- `precision*2/Te` scaling maintains steady-state accuracy
 
-**Key Innovations**:
-- **2D Q-matrix** by defining state as: `s = e + (1/Te)·e`
-- **Similarity to PI controller**:
-  - PI: `ΔU_PI = K_PI · Ts · (e + (1/TI)·e)`
-  - Q2d: `ΔU_Q = K_Q · Ts · a` where action `a` depends on state `s`
-- **Bumpless initialization**: Setting `K_Q = K_PI`, `Te = TI`, and Q-matrix as identity matrix produces identical behavior to existing PI controller
-- **Exponential state distribution**: Denser states near setpoint for accurate control
-- **No model required**: Only needs existing PI tunings (K_PI, T_I)
+**Previous approach (Q3d)**: 3D Q-matrix with separate e and ė dimensions - too slow, abandoned.
 
-#### **Q2dPLC (Future Direction - Not Yet Implemented)**
-Extension of Q2d for higher-order processes and PLC implementation:
-- **Staged learning**: Te gradually decreases from TI to Te_goal
-- **Reversed generation**: Actions generated first (based on U_max), then states
-- **Geometric action distribution**: Small actions for precision, large for fast response
-- **PLC library function block** with normalized I/O
-- **Percentage Trajectory Completion (PTC)** metric for learning supervision
+**Future direction (Q2dPLC)**: PLC implementation with reversed generation, geometric action distribution, PTC metric.
 
-### Core Theoretical Foundation
+## Quick Start
 
-**Target Trajectory**: The closed-loop system should follow a first-order reference trajectory:
+**Run**: `main.m` in MATLAB
+
+**Configure** (`m_inicjalizacja.m`):
+- `poj_iteracja_uczenia`: 1=single iteration mode, 0=full verification with metrics
+- `max_epoki`: Training duration (500 for testing, 5000+ for full training)
+- `nr_modelu`: Plant model 1-8 (1=1st order, 3=2nd order, 8=3rd order pneumatic)
+
+**Performance**: ~30-35 seconds per 100 epochs. Bottleneck: f_skalowanie() called 9.75M times.
+
+## Core Algorithm (m_regulator_Q.m)
+
+**Manual Control** (first 5 samples): `u = SP/k` to initialize toward setpoint
+
+**Q-Learning Phase**:
+1. **State**: `s = ė + (1/Te)·e`, discretize to index
+2. **Q-update**: `Q(s,a) += α·(R + γ·max(Q(s',·)) - Q(s,a))`
+3. **Action**: ε-greedy (explore/exploit), always a=0 at target state
+4. **Control**: `u += K_Q·a·dt` with saturation [0,100]%
+5. **Simulate**: Plant at 0.01s timestep
+
+**Key Features**:
+- Projection function: `e·(1/Te - 1/Ti)` for stability (optional)
+- Dead time: External delay buffers (T0 > 0)
+- Reference trajectory: Uses Te_bazowe (goal) for consistent visualization
+- Learning disabled when control saturates
+
+## Architecture
+
+**Main Loop** (`main.m`):
 ```
-F(e,ė) = e + (1/Te)·e = 0
+Init → Generate states/actions → Init Q-matrix →
+  Loop: m_regulator_Q → m_zapis_logow → m_realizacja_trajektorii_v2 →
+        m_warunek_stopu → m_reset → [Te adjustment] →
+Verification → Visualization
 ```
-where:
-- `e = SP - y` (control error)
-- `ė = de/dt` (error derivative)
-- `Te` (trajectory time constant) defines desired closed-loop speed
 
-**State Definition**: The continuous state value is:
-```
-s = e + (1/Te)·e
-```
-This value is discretized into state intervals, with the target state being `s ≈ 0`.
-
-**Control Law**: Incremental form similar to PI controller:
-```
-U_Q(t) = U_Q(t-1) + K_Q · Ts · a(s)
-```
-where action `a(s)` is selected from the Q-matrix based on current state `s`.
-
-## Project Overview
-
-This is a MATLAB implementation of the **Q2d Q-learning controller** for adaptive control of dynamic processes. The implementation validates the Q2d methodology through simulation on various plant models, particularly focusing on **3rd-order pneumatic systems** which represent realistic industrial processes with complex dynamics.
-
-## How to Run
-
-### Main Execution
-- **Standard mode**: Run `main.m` in MATLAB
-- The code has been optimized for the critical bottleneck (dynamic array growth in trajectory realization)
-
-### Configuration
-- Edit `m_inicjalizacja.m` to change simulation parameters
-- Set `poj_iteracja_uczenia = 1` for single iteration learning mode
-- Set `poj_iteracja_uczenia = 0` for full experimental verification with metrics
-- Set `max_epoki = 500` to control training duration
-
-### Expected Performance
-- **~30-35 seconds per 100 epochs** on typical hardware
-- Main bottleneck is f_skalowanie() called 9.75M times (inherent MATLAB limitation)
-- Further optimization would require MEX (C) implementation or migration to Python/NumPy
-
-## Core Architecture
-
-### Main Loop Structure
-The learning process follows this flow:
-
-1. **Initialization** (`m_inicjalizacja.m`, `m_inicjalizacja_buforov.m`)
-   - Sets simulation parameters (max_epoki, learning rate, exploration rate)
-   - Defines plant model (8 different models available)
-   - Initializes Q-learning parameters (alfa, gamma, epsilon)
-   - Sets up scaling parameters for normalization
-
-2. **State/Action Generation** (`f_generuj_stany_v2.m`)
-   - Generates discretized state space based on exponential distribution
-   - Creates action space symmetric around zero
-   - Number of states controlled by `oczekiwana_ilosc_stanow` and `dokladnosc_gen_stanu`
-
-3. **Q-matrix Initialization** (`f_generuj_macierz_Q_2d.m`)
-   - Creates 2D Q-learning matrix (states × actions)
-   - Can be initialized as identity matrix for PI-like behavior
-
-4. **Learning Episodes** - Main while loop (`epoka <= max_epoki`):
-   - **Q-regulator step** (`m_regulator_Q.m`): Selects and applies actions
-   - **Logging** (`m_zapis_logow.m`): Records state, action, reward, etc.
-   - **Trajectory metrics** (`m_realizacja_trajektorii_v2.m`): Computes percentage of trajectory realization
-   - **Stopping condition** (`m_warunek_stopu.m`): Checks if episode should end
-   - **Reset** (`m_reset.m`): Randomizes disturbance/setpoint for next episode
-   - **Adaptive Te adjustment**: Reduces Te when learning converges (controlled by MNK filter)
-
-5. **Verification** (`m_eksperyment_weryfikacyjny.m`)
-   - Runs validation experiments comparing Q-controller vs PID
-   - Computes performance indices (IAE, overshoot, settling time)
-
-6. **Visualization** (`m_rysuj_wykresy.m`, `m_rysuj_mac_Q.m`)
-   - Plots control performance
-   - Visualizes Q-matrix evolution
-
-### Q-Learning Controller (`m_regulator_Q.m`)
-
-The core algorithm implements Q2d methodology:
-
-#### **Manual Control Phase** (first ~5 samples)
-- Initializes system with open-loop control: `u = y/k`
-- Establishes initial conditions
-
-#### **Standard Q-Learning Phase**
-1. **State computation**:
-   ```matlab
-   e = SP - y                    % Control error
-   de = (e - e_prev) / dt        % Error derivative
-   stan_value = de + (1/Te) * e  % Q2d state definition
-   stan = f_find_state(stan_value, stany)  % Discretize
-   ```
-
-2. **Q-learning update** (if learning enabled):
-   ```matlab
-   Q_update = alfa * (R + gamma * maxS - Q_2d(old_state, old_action))
-   Q_2d(old_state, old_action) += Q_update
-   ```
-
-3. **Action selection** (epsilon-greedy):
-   - If `epsilon >= random()`: **Exploration** - random action with constraints (`m_losowanie_nowe.m`)
-   - Else: **Exploitation** - best action from Q-matrix (`f_best_action_in_state.m`)
-   - If in target state (`stan == nr_stanu_doc`): Always select zero action
-
-4. **Control signal calculation**:
-   ```matlab
-   u_increment = K_Q * action * dt
-   u = u + u_increment
-   ```
-   with saturation at `[0, 100]%`
-
-5. **Plant simulation**:
-   - Internal loop at 0.01s timestep for accuracy
-   - Handles delay buffers if `T0 > 0`
-   - Supports 8 different plant models via `f_obiekt.m`
-
-#### **Key Features**
-- **Projection function** (optional, `f_rzutujaca_on`): Adds `e·(1/Te - 1/Ti)` term for stability
-- **Delay compensation**: Buffers for systems with time delay `T0`
-- **Reference trajectory tracking**: Maintains `e_ref`, `y_ref` for comparison
-- **Learning control**: Disables learning when control saturates
-
-### State/Action Space Generation
-
-#### **State Space**
-States are generated by discretizing the continuous state value `s = e + (1/Te)·e`:
-- **Exponential distribution** controlled by parameter `τ` (tau)
-- Denser spacing near `s = 0` (target state) for accurate setpoint tracking
-- Symmetric around target state
-- Merged intervals that are too close (< precision threshold)
-
-#### **Action Space**
-Actions represent control signal increments:
-- **Symmetric distribution** around zero action ("do nothing")
-- Exponentially spaced for coverage of small (precise) and large (fast) corrections
-- Mapped to discrete action indices for Q-matrix
-
-#### **Key Indices**
-- `nr_stanu_doc`: Index of target state (s ≈ 0)
-- `nr_akcji_doc`: Index of target action (a = 0, "do nothing")
-
-### Dynamic Plant Models (`f_obiekt.m`)
-
-Supports 8 different plant types selected via `nr_modelu`:
-
-1. **1st order inertia**: `G(s) = k/(T·s + 1)`
-2. **DEPRECATED - Alias for model 1** (use model 1 with T0 > 0 instead)
-3. **2nd order inertia**: `G(s) = k/[(T1·s + 1)(T2·s + 1)]`
-4. **DEPRECATED - Alias for model 3** (use model 3 with T0 > 0 instead)
-5. **3rd order inertia**: `G(s) = k/[(T1·s + 1)(T2·s + 1)(T3·s + 1)]`
-6. **Pneumatic (nonlinear)**: Complex 3rd order with nonlinear elements
-7. **Oscillatory 2nd order**: Tested for T=[5 2 1]
-8. **3rd order pneumatic** (default): Real pneumatic actuator model with T=[2.34 1.55 9.38], k=0.994×0.968×0.4
-
-**Dead Time Handling**: All models support dead time by setting `T0 > 0` in `m_inicjalizacja.m`. Dead time is implemented externally by delaying the control signal before it enters the plant, giving transfer function: `G_total(s) = e^(-T0·s) · G_plant(s)`
-
-**Current configuration**: Model 8 (3rd order pneumatic system), T0 = 0 (no delay)
-
-### Adaptive Te Adjustment
-
-The system implements **staged learning** by gradually reducing Te:
-- **Initial**: `Te = Ti` (matches existing PI controller integral time)
-- **Target**: `Te = Te_bazowe` (typically 2 seconds for faster response)
-- **Trigger**: When MNK filter metrics indicate convergence:
-  ```matlab
-  mean(a_mnk_mean) > 0.2 &&
-  mean(b_mnk_mean) in (-0.05, 0.05) &&
-  flaga_zmiana_Te == 1
-  ```
-- **Step**: `Te = Te - 0.1`
-- **Effect**: Regenerates state/action spaces for new trajectory
-
-This allows the controller to gradually improve closed-loop performance as learning progresses.
-
-## Key Files
-
-### Main Scripts
-- `main.m` - Entry point for Q2d learning experiments
-
-### Controllers
-- `m_regulator_Q.m` - **Q2d controller implementation** (core algorithm)
-- `m_regulator_PID.m` - PID controller for comparison/verification
-- `f_dyskretny_PID.m` - Discrete PID implementation
-
-### Initialization & Configuration
-- `m_inicjalizacja.m` - **Simulation parameters** (Q-learning settings, plant model, scaling, dead time buffers)
-- `m_inicjalizacja_buforov.m` - Initializes logging vectors
-- `m_reset.m` - Resets episode (randomizes disturbance or setpoint)
-
-### State/Action Management
-- `f_generuj_stany_v2.m` - Generates discretized state and action spaces
-- `f_find_state.m` - Maps continuous state to discrete state index (vectorized for speed)
-- `f_best_action_in_state.m` - Finds optimal action from Q-matrix for given state
-- `f_generuj_macierz_Q_2d.m` - Initializes 2D Q-matrix
-
-### Exploration/Exploitation
-- `m_losowanie_nowe.m` - **Constrained random action selection** during exploration
-- `m_losowanie_stare.m` - Old randomization method (not used)
-
-### Learning Management
-- `m_warunek_stopu.m` - Stopping condition (checks stabilization or max iterations)
-- `m_realizacja_trajektorii_v2.m` - **Trajectory realization percentage** computation
-- `m_norma_macierzy.m` - Computes Q-matrix norm for convergence monitoring
-
-### Logging and Visualization
-- `m_zapis_logow.m` - Logs Q-controller and reference trajectory data
-- `m_rysuj_wykresy.m` - Plots control performance, actions, trajectory realization
-- `m_rysuj_mac_Q.m` - Visualizes Q-matrix as 3D mesh plot
-
-### Verification
-- `m_eksperyment_weryfikacyjny.m` - Runs validation experiments
-- `f_licz_wskazniki.m` - Computes performance indices (IAE, overshoot, settling time)
-
-### Utility Functions
-- `f_skalowanie.m` - **Bidirectional scaling** between physical and normalized ranges
-- `f_obiekt.m` - Plant model simulation (8 different models, dead time handled externally)
-- `f_bufor.m` - FIFO buffer for dead time compensation
-
-## Important Parameters
-
-### Q-Learning Parameters (in `m_inicjalizacja.m`)
-
-**Learning**:
-- `alfa = 0.1` - Learning rate (how quickly Q-matrix is updated)
-- `gamma = 0.99` - Discount factor (importance of future rewards)
-- `eps_ini = 0.3` - Initial exploration rate (probability of random action)
-- `nagroda = 1` - Reward for reaching target state
-
-**Exploration**:
-- `RD = 5` - Random deviation range for constrained exploration
-- `max_powtorzen_losowania_RD = 10` - Max attempts to find valid random action
-
-**Controller Gain**:
-- `kQ = Kp = 1` - Q-controller gain (initialized from PI controller)
-
-**Trajectory**:
-- `Te_bazowe = 2` - Target trajectory time constant (goal)
-- `Te = Ti = 20` - Initial trajectory time constant (starts at PI integral time)
-
-**State Space**:
-- `dokladnosc_gen_stanu = 0.5` - State generation precision (determines steady-state accuracy)
-- `oczekiwana_ilosc_stanow = 100` - Expected number of states (actual may vary after merging)
-
-**Optional Features**:
-- `f_rzutujaca_on = 0` - Enable/disable projection function
-- `reakcja_na_T0 = 0` - Enable/disable delay buffer response
-
-### Simulation Parameters
-
-**Training Duration**:
-- `max_epoki = 500` - Maximum training epochs
-- `maksymalna_ilosc_iteracji_uczenia = 4000` - Max iterations per epoch (randomized around µ=3000)
-- `oczekiwana_ilosc_probek_stabulizacji = 20` - Samples required to declare stabilization
-
-**Timing**:
-- `dt = 0.1` - Sampling time for Q-controller and logging
-- Internal plant simulation: 0.01s (10x finer for accuracy)
-
-**Learning Modes**:
-- `uczenie_obciazeniowe = 1` - Learn with **load disturbances** (d randomized)
-- `uczenie_zmiana_SP = 0` - Learn with **setpoint changes** (SP randomized)
-- Only one mode should be active
-
-**Disturbance Settings** (if uczenie_obciazeniowe = 1):
-- `zakres_losowania_zakl_obc = 0.5` - Range for load disturbance randomization
-- Disturbance `d` drawn from normal distribution: µ=0, σ=0.167
-
-### PI Controller Parameters (for comparison)
-- `Kp = 1` - Proportional gain
-- `Ti = 20` - Integral time
-- `Td = 0` - Derivative time (not used)
-- `dt_PID = 0.1` - PID sampling time
-
-### Plant Parameters
-
-**Currently Selected: Model 8** (3rd order pneumatic system)
-- `nr_modelu = 8`
-- `T = [2.34 1.55 9.38]` - Time constants [s]
-- `k = 0.994 × 0.968 × 0.4 = 0.386` - Overall gain
-- `Ks = tf(0.994,[2.34 1])*tf(0.968,[1.55 1])*tf(0.4,[9.38 1])`
-
-**Other Settings**:
-- `SP_ini = 50` - Initial setpoint [%]
-- `T0 = 0` - Time delay (disabled)
-- `dist_on = 0` - Measurement noise (disabled)
-
-### Scaling Convention
-
-The system uses bidirectional scaling via `f_skalowanie(max_in, min_in, max_out, min_out, value)`:
-
-**Process Variable Ranges** (proc_* variables):
-- Error: `[-100%, +100%]`
-- Output: `[0%, 100%]`
-- Control: `[0%, 100%]`
-
-**Normalized Ranges** (wart_* variables):
-- Error: `[-1, +1]`
-- Output: `[0, 1]`
-- Control: `[0, 2]` (allows 200% control authority internally)
-
-**Usage**:
+**Staged Te Reduction**: When MNK filter shows convergence, Te decreases by 0.1s and state/action spaces regenerate.
+
+## Key Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| **Q-Learning** | | |
+| `alfa` | 0.1 | Learning rate |
+| `gamma` | 0.99 | Discount factor |
+| `eps_ini` | 0.3 | Initial exploration rate |
+| `RD` | 5 | Random deviation range |
+| **Trajectory** | | |
+| `Te_bazowe` | 2 | Goal time constant [s] |
+| `Te` | 20 | Initial (=Ti) [s] |
+| `kQ` | 1 | Controller gain (=Kp) |
+| **State Space** | | |
+| `dokladnosc_gen_stanu` | 0.5 | Precision (steady-state accuracy) |
+| `oczekiwana_ilosc_stanow` | 100 | Expected number of states |
+| **Simulation** | | |
+| `max_epoki` | 500 | Maximum training epochs |
+| `dt` | 0.1 | Sampling time [s] |
+| `uczenie_obciazeniowe` | 1 | Learn with disturbances (vs setpoint changes) |
+| **PI (comparison)** | | |
+| `Kp` | 1 | Proportional gain |
+| `Ti` | 20 | Integral time [s] |
+| **Plant** | | |
+| `nr_modelu` | 1-8 | Model selection (1=1st order, 8=3rd order pneumatic) |
+| `T` | varies | Time constant(s) [s] |
+| `k` | varies | Process gain |
+| `T0` | 0 | Dead time [s] |
+
+## Plant Models (f_obiekt.m)
+
+| Model | Description | Transfer Function |
+|-------|-------------|-------------------|
+| 1 | 1st order | k/(T·s+1) |
+| 3 | 2nd order | k/[(T₁·s+1)(T₂·s+1)] |
+| 5 | 3rd order | k/[(T₁·s+1)(T₂·s+1)(T₃·s+1)] |
+| 6 | Pneumatic (nonlinear) | Complex 3rd order |
+| 7 | Oscillatory 2nd order | Tested for T=[5 2 1] |
+| 8 | 3rd order pneumatic | T=[2.34 1.55 9.38], k=0.386 |
+
+Models 2,4 deprecated. Dead time: Add T0 > 0 (external delay).
+
+## File Organization
+
+| Category | Files | Purpose |
+|----------|-------|---------|
+| **Main** | main.m | Entry point |
+| **Controllers** | m_regulator_Q.m, m_regulator_PID.m | Q2d and PI implementations |
+| **Init** | m_inicjalizacja.m, m_inicjalizacja_buforov.m, m_reset.m | Setup and episode reset |
+| **State/Action** | f_generuj_stany_v2.m, f_find_state.m, f_best_action_in_state.m, f_generuj_macierz_Q_2d.m | Space generation and lookup |
+| **Learning** | m_warunek_stopu.m, m_realizacja_trajektorii_v2.m, m_norma_macierzy.m, m_losowanie_nowe.m | Episode management and exploration |
+| **Logging/Viz** | m_zapis_logow.m, m_rysuj_wykresy.m, m_rysuj_mac_Q.m | Data recording and plotting |
+| **Verification** | m_eksperyment_weryfikacyjny.m, f_licz_wskazniki.m | Q vs PI comparison, metrics (IAE, overshoot, settling time) |
+| **Utilities** | f_skalowanie.m, f_obiekt.m, f_bufor.m | Scaling, plant simulation, delay buffers |
+
+## Workflows
+
+**Standard Experiment**:
+1. Edit `m_inicjalizacja.m`: Set `max_epoki`, `uczenie_obciazeniowe`, `nr_modelu`, `T`, `k`
+2. Run `main.m`
+3. Monitor: Epoch progress, stabilization %, current Te
+4. View plots: Q vs PI vs Reference, trajectory realization, Q-matrix evolution
+
+**Change Plant Model**:
 ```matlab
-% Scale to normalized
-e_norm = f_skalowanie(wart_max_e, wart_min_e, proc_max_e, proc_min_e, e);
-
-% Scale back to physical
-e_phys = f_skalowanie(proc_max_e, proc_min_e, wart_max_e, wart_min_e, e_norm);
+% Example: 2nd order
+T = [5 2]; nr_modelu = 3; Ks = tf(1,[5 1])*tf(1,[2 1]);
+% May adjust: Te_bazowe, Ti, Kp, maksymalna_ilosc_iteracji_uczenia
 ```
 
-## Common Workflows
+## Coding Standards
 
-### Running a Standard Training Experiment
-1. Configure parameters in `m_inicjalizacja.m`:
-   - Set `max_epoki` (typically 500 for testing, 5000+ for full training)
-   - Choose learning mode: `uczenie_obciazeniowe` or `uczenie_zmiana_SP`
-   - Select plant model via `nr_modelu` and corresponding `T`, `k`
+**Performance**:
+- Preallocate arrays, use indexed access with counters (`logi_idx`)
+- Trim arrays when done (`trim_logi` flag)
+- Wrap size calculations in `round()`
 
-2. Run `main.m` in MATLAB
+**Visualization**:
+- Theme-neutral colors (RGB arrays, never 'w' or 'k')
+- Use `figure()` without Position for tabbed interface
+- Check variable existence: `exist()`, `isfield()`, `~isempty()`
+- Dynamic sizing: `size()`, `length()` instead of hardcoded dimensions
 
-3. Monitor console output showing:
-   - Epoch progress every 100 epochs
-   - Time per 100 epochs (~30-35 seconds)
-   - Percentage of epochs ending in stabilization
-   - Current Te value
+**Verification Flow**:
+- First run (before learning): stores `logi_before_learning`
+- Second run (after learning): uses `logi`
+- Plots show Q-before vs PI vs Q-after comparison
 
-4. Results are plotted automatically:
-   - Control performance (Q vs PI vs Reference)
-   - Trajectory realization percentage
-   - Q-matrix evolution
+## Scaling Convention
 
-### Testing Different Plant Models
-1. Edit `m_inicjalizacja.m`:
-   ```matlab
-   % Example: 2nd order system
-   T = [5 2];
-   nr_modelu = 3;
-   Ks = tf(1,[5 1])*tf(1,[2 1]);
-   ```
+`f_skalowanie(max_in, min_in, max_out, min_out, value)` for bidirectional conversion:
+- **Process ranges**: Error [-100,+100]%, Output [0,100]%, Control [0,100]%
+- **Normalized**: Error [-1,+1], Output [0,1], Control [0,2] (allows 200% authority)
 
-2. May need to adjust:
-   - `Te_bazowe` (smaller for faster systems)
-   - `Ti`, `Kp` (PI tunings to match system dynamics)
-   - `maksymalna_ilosc_iteracji_uczenia` (longer for slower systems)
+## Design Insights
 
-3. Run `main.m`
+**Staged Learning**: Te reduction preserves Q-matrix while regenerating state/action spaces
+- Small 0.1s steps prevent catastrophic forgetting
+- `precision*2/Te` scaling maintains accuracy
+- Continued learning adapts Q-values naturally
 
-### Analyzing Q-Matrix Convergence
-- Q-matrix norm sampled every `probkowanie_norma_macierzy = 100` epochs
-- View evolution: `plot(max_macierzy_Q)`
-- Enable animation: `gif_on = 1` in `m_inicjalizacja.m`
-- Norm computed in `m_norma_macierzy.m`
+**Reference Trajectory**: Always uses Te_bazowe (not current Te)
+- Shows final performance goal consistently
+- Enables meaningful before/after comparison
+- Does NOT track disturbances (they show as deviations controllers must reject)
 
-### Comparing Q-Learning vs PI Performance
-After training completes, `m_eksperyment_weryfikacyjny.m` automatically:
-1. Runs verification experiments (default: 600 seconds)
-2. Tests both Q-controller and PI controller on same scenarios
-3. Computes metrics: IAE, overshoot, settling time
-4. Results stored in: `IAE_wek`, `maks_przereg_wek`, `czas_regulacji_wek`
+**Multi-Model**: 8 models share same Q2d implementation (1st→3rd order, nonlinear)
 
-## Performance Notes
+## Publications
 
-### Current Bottlenecks
-Profiling shows the main performance limitations:
-1. **f_skalowanie()**: 6.43s self-time (9.75M calls) - scaling function overhead
-2. **f_obiekt()**: 18.52s (1.58M calls) - plant simulation
-3. **m_warunek_stopu()**: 13.45s - stopping condition checks
-4. **mean()**: 10.77s - MATLAB built-in statistics
+1. **2022**: "Implementation aspects..." - Introduces Q2d, validates on 2nd order
+2. **ASC (Submitted)**: "Application of Self-Improving..." - Industrial focus, bumpless switching
+3. **TIE (In prep)**: "PLC-based Implementation..." - Q2dPLC extensions, staged learning, PTC metric
 
-**Optimization attempts showed**: MATLAB's interpreted nature makes millions of function calls inherently slow. Further speedup (10-100x) would require:
-- MEX (C/C++) implementation of critical functions
-- Python + NumPy for better vectorization
-- Julia for JIT compilation
-
-### Optimizations Applied
-
-The codebase includes several critical optimizations:
-
-1. **Preallocated logging arrays** in `m_zapis_logow.m` (2025-11-19):
-   - All 38 logging arrays preallocated to `maksymalna_ilosc_iteracji_uczenia` samples
-   - Uses indexed access (`logi.Q_y(logi_idx) = value`) instead of dynamic growth (`end+1`)
-   - Automatic trimming when episode ends via `trim_logi` flag
-   - **Performance gain**: 10-100x faster logging (O(1) vs O(n²) complexity)
-
-2. **Preallocated trajectory array** in `m_inicjalizacja.m` (line 135):
-   - `realizacja_traj_epoka` preallocated to 20000 samples
-   - Index reset in `m_reset.m` for each epoch
-   - **Performance gain**: ~10% faster overall
-
-3. **Integer conversion safety** (2025-11-19):
-   - All array size calculations wrapped in `round()`:
-     - `max_samples = round(maksymalna_ilosc_iteracji_uczenia)` in m_zapis_logow.m
-     - `maksymalna_ilosc_iteracji_uczenia = round(normrnd(mu, sigma))` in m_reset.m
-     - `round(50 / dt)` and similar in m_inicjalizacja.m
-   - Prevents "Size inputs must be integers" errors from floating-point division
-
-## Code Quality and Recent Improvements
-
-### Visualization System (m_rysuj_wykresy.m)
-
-**Complete refactor** (2025-11-19) consolidating all plotting into a single file:
-
-#### **Theme-Neutral Colors**
-All plots use RGB colors that work on both light and dark MATLAB themes:
-```matlab
-color_Q = 'b';                           % Blue (Q-controller)
-color_Ref = [0.3010 0.7450 0.9330];     % Cyan (Reference trajectory)
-color_PI = [0.1 0.6 0.1];               % Green (PI controller)
-color_Target = [0.5 0.5 0.5];           % Gray (Target/setpoint lines)
-color_Disturbance = [0.8500 0.3250 0.0980];  % Orange-Red
-color_Q_before = [0.3010 0.7450 0.9330];  % Cyan (Q before learning)
-color_Q_after = [1 0 0];                  % Red (Q after learning)
-```
-**Never use 'w' (white) or 'k' (black)** as they become invisible depending on theme.
-
-#### **Tabbed Figure Interface**
-- Use `figure()` without Position parameter to create MATLAB's native tabbed interface
-- **Don't use**: `figure('Position', [x, y, width, height])` - creates separate windows
-- Provides better organization for multiple plots
-
-#### **Plot Organization**
-
-**Single Iteration Mode** (`poj_iteracja_uczenia = 1`):
-- Figure 1: Output, Control, Disturbance, Control Increment (4 subplots)
-- Figure 2: State and Action Information (4 subplots)
-- Figure 3: Error and Derivative Analysis (4 subplots)
-- Figure 4: MNK Analysis if available (4 subplots)
-
-**Verification Mode** (`poj_iteracja_uczenia = 0`):
-- Figures 1-4: Same as single iteration but comparing Q vs PI vs Reference
-- **Figure 5: Main Comparison** (Q-before vs PI vs Q-after Learning):
-  - Shows performance improvement from learning
-  - Includes setpoint reference line
-  - Conditional PI display (only if data exists)
-- **Figure 6: Learning Process Parameters** (4 subplots):
-  - Stabilization percentage per epoch
-  - Learning time per epoch
-  - Q-matrix norm differences (convergence indicator)
-  - Q-matrix norm evolution
-- **Figure 7: Performance Metrics** (5 subplots):
-  - IAE comparison (bar chart)
-  - IAE trajectory over time
-  - Overshoot comparison (bar chart)
-  - Settling time comparison (bar chart)
-  - Trajectory realization percentage
-
-#### **Safe Variable Access**
-All plots check for variable existence:
-```matlab
-if exist('logi_before_learning', 'var') && licz_wskazniki == 0
-    % Comparison plots
-end
-
-if isfield(logi, 'PID_t') && ~isempty(logi.PID_t) && sum(logi.PID_y) > 0
-    plot(logi.PID_t, logi.PID_y, ...)  % Only plot if PI data exists
-end
-```
-
-#### **Dynamic Sizing**
-Never hardcode array dimensions - always use `size()`:
-```matlab
-% WRONG:
-for i=1:99  % Assumes exactly 99 states
-    cc(i) = i;
-end
-
-% CORRECT:
-[n_states, n_actions] = size(Q_2d);
-for i = 1:n_states
-    policy_matrix(i, best_action_idx(i)) = 1;
-end
-```
-
-### Verification Experiment Flow
-
-The verification workflow in `main.m` (lines 69-74):
-```matlab
-if poj_iteracja_uczenia == 0
-    m_eksperyment_weryfikacyjny  % Run verification
-    m_rysuj_wykresy              % Generate comparison plots
-    figure()
-    mesh(Q_2d)                    % Show final Q-matrix
-end
-```
-
-**Data Storage**:
-- First verification run (before learning): stores `logi_before_learning`
-- Second verification run (after learning): uses current `logi`
-- Both datasets plotted together for comparison
-
-### Code Architecture Principles
-
-1. **Preallocate all arrays**: Never use dynamic growth with `end+1`
-2. **Use indexed access**: Maintain index counters (`logi_idx`, `realizacja_traj_epoka_idx`)
-3. **Trim when done**: Use flags like `trim_logi` to reduce arrays to actual size
-4. **Integer-safe math**: Wrap all size calculations in `round()`
-5. **Theme-neutral colors**: Always use RGB arrays, never 'w' or 'k'
-6. **Check before use**: Use `exist()`, `isfield()`, `~isempty()` before accessing variables
-7. **Dynamic sizing**: Use `size()`, `length()` instead of hardcoded dimensions
-8. **Tabbed figures**: Use `figure()` for better UI organization
-
-## Research Publications
-
-This codebase supports three published/submitted articles:
-
-1. **"Implementation aspects of Q-learning controller for a class of dynamical processes"** (2022)
-   - Introduces Q2d approach
-   - Shows 2D Q-matrix reduces learning time compared to Q3d
-   - Validates on 2nd order systems
-
-2. **"Application of Self-Improving Q-learning Controller for a Class of Dynamical Processes: Implementation Aspects"** (Submitted to ASC)
-   - Comprehensive Q2d methodology
-   - Practical industrial focus
-   - Addresses 60% poor PID loop performance problem
-   - Bumpless switching without process model
-
-3. **"PLC-based Implementation of Self-improving Q-learning Controller and Validation for Higher-Order Processes"** (In preparation for TIE)
-   - Extends Q2d to Q2dPLC
-   - Staged learning for higher-order processes
-   - PLC function block implementation
-   - Percentage Trajectory Completion (PTC) metric
-
-## Future Directions (Q2dPLC)
-
-The next research phase will implement Q2dPLC extensions:
-- [ ] Staged Te reduction from TI to Te_goal
-- [ ] Reversed action/state generation (actions first)
-- [ ] Geometric action distribution
-- [ ] PLC library function block
-- [ ] Normalized I/O (0-100%)
-- [ ] PTC-based learning supervision
-- [ ] Validation on real industrial hardware
 
 ## Contact
 
-For questions about this research:
-- **Jakub Musiał** - Silesian University of Technology, Department of Automatic Control and Robotics
-- **Primary contact**: Prof. Jacek Czeczot (jacek.czeczot@polsl.pl)
+**Jakub Musiał** - Silesian University of Technology, Dept. of Automatic Control and Robotics
+**Primary**: Prof. Jacek Czeczot (jacek.czeczot@polsl.pl)

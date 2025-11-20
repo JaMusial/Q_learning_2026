@@ -6,7 +6,7 @@ y_PID=f_skalowanie(wart_max_y,wart_min_y,proc_max_y,proc_min_y,y_PID);
 %% sterowanie reczne
 % if iter<=ilosc_probek_sterowanie_reczne + T0/dt + dodatkowe_probki_reka
  if iter<=ilosc_probek_sterowanie_reczne
-    u_PID=y_PID/k;
+    u_PID=SP/k;
     e_s_PID=e_PID;
     e_PID=SP-y_PID;
     de_PID=0;

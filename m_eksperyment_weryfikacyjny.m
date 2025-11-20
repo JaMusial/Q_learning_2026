@@ -1,6 +1,31 @@
 SP=20;
 y=f_skalowanie(proc_max_y,proc_min_y,wart_max_y,wart_min_y,SP);
 y_PID=f_skalowanie(proc_max_y,proc_min_y,wart_max_y,wart_min_y,SP);
+% Initialize reference trajectory
+y_ref = y;
+e_ref = 0;
+de_ref = 0;
+de2_ref = 0;
+d_ref = 0;
+% Initialize Q controller state
+e = 0;
+de = 0;
+de2 = 0;
+u = SP / k;
+% Initialize PID controller state
+e_PID = 0;
+de_PID = 0;
+de2_PID = 0;
+u_PID = SP / k;
+% Initialize plant internal states for both controllers
+y1_n = f_skalowanie(proc_max_y,proc_min_y,wart_max_y,wart_min_y,SP);
+y2_n = f_skalowanie(proc_max_y,proc_min_y,wart_max_y,wart_min_y,SP);
+y3_n = f_skalowanie(proc_max_y,proc_min_y,wart_max_y,wart_min_y,SP);
+y1_n_PID = y1_n;
+y2_n_PID = y2_n;
+y3_n_PID = y3_n;
+% Initialize time
+t = 0;
 eps=-1;
 iter=1;
 zapis_logi=1;
