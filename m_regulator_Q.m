@@ -44,7 +44,7 @@ if iter <= ilosc_probek_sterowanie_reczne
     uczenie = 0;
     czy_losowanie = 0;
 
-    if reakcja_na_T0 == 1 && T0 > 0
+    if T0_controller > 0
         [stan, bufor_state] = f_bufor(stan, bufor_state);
         [wyb_akcja, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);
     end
@@ -82,7 +82,7 @@ else
     old_state = stan;
     stan = f_find_state(stan_value, stany);
 
-    if reakcja_na_T0 == 1 && T0 > 0
+    if T0_controller > 0
         [stan_T0, bufor_state] = f_bufor(stan, bufor_state);
         [old_stan_T0, bufor_old_state] = f_bufor(old_state, bufor_old_state);
         [wyb_akcja_T0, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);

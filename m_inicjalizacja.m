@@ -3,7 +3,6 @@ gif_on = 0;
 poj_iteracja_uczenia = 0;
 max_epoki = 300;
 oczekiwana_ilosc_probek_stabulizacji = 20;
-reakcja_na_T0 = 0;
 maksymalna_ilosc_iteracji_uczenia = 4000;
 uczenie_obciazeniowe = 1;
 zakres_losowania_zakl_obc = 0.5;
@@ -63,7 +62,8 @@ rozmiar_okna_sredniej_realizacji = 5;
 
 SP_ini = 50;
 k = 1;
-T0 = 0;
+T0 = 0;          % Actual plant dead time (physical reality)
+T0_controller = 0;  % Dead time controller uses for compensation (0 = no compensation)
 dodatkowe_probki_reka = 5;
 
 % Selected model: Third order pneumatic system
@@ -71,15 +71,18 @@ T = [2.34 1.55 9.38];
 nr_modelu = 1;
 Ks = tf(0.994, [T(1) 1]) * tf(0.968, [T(2) 1]) * tf(0.4, [T(3) 1]);
 
-% Initialize delay buffers if T0 is non-zero
+% Initialize plant delay buffers (actual physical dead time)
 if T0 ~= 0
     bufor_T0 = zeros(1, round(T0/dt));
     bufor_T0_PID = zeros(1, round(T0/dt));
-    bufor_state = zeros(1, round(T0/dt));
-    bufor_wyb_akcja = zeros(1, round(T0/dt));
-    bufor_R = zeros(1, round(T0/dt));
-    bufor_uczenie = zeros(1, round(T0/dt));
-    bufor_old_state = zeros(1, round(T0/dt));
+end
+
+% Initialize controller compensation buffers (what controller thinks dead time is)
+if T0_controller ~= 0
+    bufor_state = zeros(1, round(T0_controller/dt));
+    bufor_wyb_akcja = zeros(1, round(T0_controller/dt));
+    bufor_old_state = zeros(1, round(T0_controller/dt));
+    bufor_uczenie = zeros(1, round(T0_controller/dt));
 end
 
 %% Scaling parameters

@@ -35,6 +35,20 @@ eks_wer=1;
 d=0;
 ilosc_probek_sterowanie_reczne = round(T0/dt) + dodatkowe_probki_reka;
 
+% Reset plant delay buffers for clean verification test
+if T0 ~= 0
+    bufor_T0 = zeros(1, round(T0/dt));
+    bufor_T0_PID = zeros(1, round(T0/dt));
+end
+
+% Reset controller compensation buffers for clean verification test
+if T0_controller ~= 0
+    bufor_state = zeros(1, round(T0_controller/dt));
+    bufor_wyb_akcja = zeros(1, round(T0_controller/dt));
+    bufor_old_state = zeros(1, round(T0_controller/dt));
+    bufor_uczenie = zeros(1, round(T0_controller/dt));
+end
+
 dlugosc_symulacji = round(czas_eksp_wer/dt) + ilosc_probek_sterowanie_reczne;
 for iter_test=1:dlugosc_symulacji
     if iter_test==15+ilosc_probek_sterowanie_reczne
