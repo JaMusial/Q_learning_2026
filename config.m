@@ -8,8 +8,8 @@
 %% ========================================================================
 
 %% --- Simulation Control ---
-poj_iteracja_uczenia = 1;          % 1=single iteration mode, 0=full verification with metrics
-max_epoki = 10;                    % Training duration (500 for testing, 5000+ for full training)
+poj_iteracja_uczenia = 0;          % 1=single iteration mode, 0=full verification with metrics
+max_epoki = 5000;                    % Training duration (500 for testing, 5000+ for full training)
 maksymalna_ilosc_iteracji_uczenia = 4000;  % Max samples per epoch
 czas_eksp_wer = 600;               % Verification experiment time [s]
 gif_on = 0;                        % 1=generate GIF animation, 0=disabled
@@ -20,6 +20,22 @@ uczenie_zmiana_SP = 0;             % 1=learn with SP changes, 0=disabled (mutual
 zakres_losowania_zakl_obc = 0.5;   % Disturbance randomization range
 zakres_losowania_zmian_SP = 1;     % SP change randomization range
 dist_on = 0;                       % 1=external disturbance enabled, 0=disabled
+
+%% --- Episode Configuration (Load Disturbance Mode) ---
+% These parameters control randomization when uczenie_obciazeniowe = 1
+disturbance_range = 0.5;           % Disturbance range: ±0.5 at 3-sigma covers typical industrial disturbances
+mean_episode_length = 3000;        % Mean episode length [iterations]
+episode_length_variance = 300;     % Episode length standard deviation [iterations]
+min_episode_length = 10;           % Minimum episode length (safety limit for meaningful learning)
+
+%% --- Progress Reporting Configuration ---
+% Adaptive reporting thresholds based on total training duration
+short_run_threshold = 10000;       % Max epochs for "short run" (reports every short_run_interval)
+medium_run_threshold = 15000;      % Max epochs for "medium run" (reports every medium_run_interval)
+                                   % Long runs (>medium_run_threshold) report every long_run_interval
+short_run_interval = 100;          % Reporting interval for short runs [epochs]
+medium_run_interval = 500;         % Reporting interval for medium runs [epochs]
+long_run_interval = 1000;          % Reporting interval for long runs [epochs]
 
 %% --- Plant Model Selection ---
 % Available models:

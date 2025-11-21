@@ -2,6 +2,12 @@
 
 Guidance for Claude Code when working with this Q2d Q-learning controller repository.
 
+**IMPORTANT CODING RULES**:
+- **NEVER** use Polish special characters (ą, ć, ę, ł, ń, ó, ś, ź, ż) in variable names - MATLAB compatibility issue
+- Use English names for NEW variables when possible
+- Existing Polish variable names (e.g., `epoka`, `stan`, `uchyb`) are preserved for backward compatibility
+- See Variable Glossary in "Coding Standards" section for translations
+
 ## Research Context
 
 **Problem**: 60% of industrial PID loops perform poorly. Retuning requires expert knowledge and is impractical at scale.
@@ -37,7 +43,11 @@ Guidance for Claude Code when working with this Q2d Q-learning controller reposi
 - `max_epoki`: Training duration (500 for testing, 5000+ for full training)
 - `nr_modelu`: Plant model 1-8 (1=1st order, 3=2nd order, 8=3rd order pneumatic)
 
-**Performance**: ~30-35 seconds per 100 epochs. Bottleneck: f_skalowanie() called 9.75M times.
+**Performance**: ~30-35 seconds per 100 epochs.
+
+**Optimizations Applied**:
+- Array preallocation (2025): Eliminated incremental growth bottleneck for history arrays
+- Remaining bottleneck: f_skalowanie() called 9.75M times per 100 epochs
 
 ## Core Algorithm (m_regulator_Q.m)
 
@@ -94,6 +104,9 @@ Guidance for Claude Code when working with this Q2d Q-learning controller reposi
 
 **Code Implementation** (m_regulator_Q.m:86-105):
 ```matlab
+% Note: Variable names use Polish terms (stan=state, wyb_akcja=selected_action,
+%       bufor=buffer, nr_stanu_doc=goal_state_number) for historical compatibility
+
 if T0_controller > 0
     % Buffer current state/action for delayed credit assignment
     [old_stan_T0, bufor_state] = f_bufor(stan, bufor_state);
@@ -177,6 +190,8 @@ Verification → Visualization
 
 ## Key Parameters
 
+All configurable parameters are defined in `config.m`:
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | **Q-Learning** | | |
@@ -195,6 +210,17 @@ Verification → Visualization
 | `max_epoki` | 500 | Maximum training epochs |
 | `dt` | 0.1 | Sampling time [s] |
 | `uczenie_obciazeniowe` | 1 | Learn with disturbances (vs setpoint changes) |
+| **Episode Configuration** | | |
+| `disturbance_range` | 0.5 | Disturbance range: ±0.5 at 3-sigma |
+| `mean_episode_length` | 3000 | Mean episode length [iterations] |
+| `episode_length_variance` | 300 | Episode length std deviation [iterations] |
+| `min_episode_length` | 10 | Minimum episode length (safety limit) |
+| **Progress Reporting** | | |
+| `short_run_threshold` | 10000 | Threshold for short runs (report every 100 epochs) |
+| `medium_run_threshold` | 15000 | Threshold for medium runs (report every 500 epochs) |
+| `short_run_interval` | 100 | Reporting interval for short runs [epochs] |
+| `medium_run_interval` | 500 | Reporting interval for medium runs [epochs] |
+| `long_run_interval` | 1000 | Reporting interval for long runs [epochs] |
 | **PI (comparison)** | | |
 | `Kp` | 1 | Proportional gain |
 | `Ti` | 20 | Integral time [s] |
@@ -231,33 +257,122 @@ Models 2,4 deprecated. Dead time: Add T0 > 0 (external delay).
 | **Verification** | m_eksperyment_weryfikacyjny.m, f_licz_wskazniki.m | Q vs PI comparison, metrics (IAE, overshoot, settling time) |
 | **Utilities** | f_skalowanie.m, f_obiekt.m, f_bufor.m | Scaling, plant simulation, delay buffers |
 
+**Recently Refactored** (2025):
+- `config.m`: Added episode configuration and progress reporting parameters (eliminated magic numbers)
+- `m_reset.m`: Comprehensive documentation, clear mode separation, mathematical divisor calculation (replaced 4-branch if-elseif, **fixed bug for range≥99**), mutual exclusivity validation, error() instead of quit, uses parameters from config.m
+- `m_warunek_stopu.m`: Eliminated code duplication, unified progress reporting, English comments, indexed array access, uses parameters from config.m
+- `m_inicjalizacja_buforov.m`: Array preallocation with proper sizing, index counters for performance, named constants
+- `main.m`: Added array trimming after training loop
+- `test_divisor_logic.m`: Verification script for divisor calculation (14 test cases, identifies 2 bug fixes)
+- `DIVISOR_LOGIC_ANALYSIS.md`: Detailed explanation of bug fixes and formula derivation
+
 ## Workflows
 
 **Standard Experiment**:
-1. Edit `m_inicjalizacja.m`: Set `max_epoki`, `uczenie_obciazeniowe`, `nr_modelu`, `T`, `k`
+1. Edit `m_inicjalizacja.m`: Set parameters
+   - `max_epoki` (max_epochs): Training duration (500 for testing, 5000+ for full training)
+   - `uczenie_obciazeniowe` (disturbance_learning): 1=learn with load disturbances
+   - `uczenie_zmiana_SP` (setpoint_learning): 1=learn with setpoint changes
+   - `nr_modelu` (model_number): Plant model 1-8
+   - `T`: Time constant(s), `k`: Process gain
 2. Run `main.m`
 3. Monitor: Epoch progress, stabilization %, current Te
 4. View plots: Q vs PI vs Reference, trajectory realization, Q-matrix evolution
 
 **Change Plant Model**:
 ```matlab
-% Example: 2nd order
+% Example: 2nd order plant
+% Note: nr_modelu = model_number, adjust time constants T and gain k as needed
 T = [5 2]; nr_modelu = 3; Ks = tf(1,[5 1])*tf(1,[2 1]);
-% May adjust: Te_bazowe, Ti, Kp, maksymalna_ilosc_iteracji_uczenia
+% May adjust: Te_bazowe (goal time constant), Ti, Kp, maksymalna_ilosc_iteracji_uczenia (max episode length)
 ```
 
 ## Coding Standards
 
+**Documentation**:
+- All scripts should have file headers with: PURPOSE, INPUTS, OUTPUTS, NOTES, SIDE EFFECTS
+- Use section dividers (`%% ======...`) to separate logical blocks
+- Inline comments should explain WHY, not just WHAT
+- Complex algorithms need step-by-step explanation
+- See `m_reset.m` and `m_warunek_stopu.m` for reference style
+
+**Magic Numbers**:
+- **NEVER** hard-code numeric literals without explanation
+- Two types of numbers:
+  1. **Configurable parameters**: Move to `config.m` with descriptive names and comments
+  2. **Mathematical/physical constants**: Use named constants with explanation
+- Example of configurable parameters in `config.m`:
+  ```matlab
+  disturbance_range = 0.5;        % Disturbance range: ±0.5 at 3-sigma
+  mean_episode_length = 3000;     % Mean episode length [iterations]
+  short_run_interval = 100;       % Report every 100 epochs for short runs
+  ```
+- Example of mathematical constants in code:
+  ```matlab
+  SIGMA_DIVISOR = 3;              % Statistical constant (3-sigma rule)
+  SAFETY_MARGIN = 10;             % Array preallocation buffer
+  ```
+- See refactored `m_reset.m`, `m_warunek_stopu.m`, `m_inicjalizacja_buforow.m` for examples
+
 **Performance**:
-- Preallocate arrays, use indexed access with counters (`logi_idx`)
-- Trim arrays when done (`trim_logi` flag)
-- Wrap size calculations in `round()`
+- **CRITICAL**: Preallocate arrays to maximum expected size, use indexed access with counters
+  - Example: `arr = zeros(1, max_size); idx = 0;` then `idx = idx + 1; arr(idx) = value;`
+  - Avoid `arr(end+1) = value` which reallocates memory on each append
+  - For long runs (>10k epochs), preallocation provides significant speedup
+  - See `m_inicjalizacja_buforov.m` for reference implementation
+- Trim arrays when done to actual used size: `arr = arr(1:idx);`
+- Wrap size calculations in `round()` to avoid floating-point indices
+- Avoid code duplication - extract repeated logic into variables/functions
+
+**Variable Naming**:
+- **CRITICAL**: Never use Polish special characters (ą, ć, ę, ł, ń, ó, ś, ź, ż) in variable names - MATLAB compatibility issue
+- Use English names for new variables when possible
+- Existing Polish names preserved for compatibility (documented below)
+- Comments can be in English or Polish, but code must be ASCII-compatible
+
+**Common Variable Glossary** (Polish → English meaning):
+- `epoka` → epoch (training epoch number)
+- `iteracja_uczenia` → learning_iteration (iteration within episode)
+- `iter` → iteration (global iteration counter)
+- `uchyb` / `dopuszczalny_uchyb` → error / acceptable_error
+- `dokladnosc` / `dokladnosc_gen_stanu` → precision / state_generation_precision
+- `stan` / `stan_ustalony` → state / steady_state
+- `wyb_akcja` → selected_action
+- `zakres_losowania` → sampling_range
+- `maksymalna_ilosc_iteracji_uczenia` → max_episode_length
+- `oczekiwana_ilosc_probek_stabulizacji` → expected_stabilization_samples (note: typo in original)
+- `inf_zakonczono_epoke_stabil` → count_epochs_ended_by_stabilization
+- `inf_zakonczono_epoke_max_iter` → count_epochs_ended_by_timeout
+- `czas_uczenia` → learning_time
+- `prob(k)a` → sample
+- `bufor` → buffer
+- `wylosowany_SP` / `wylosowane_d` → sampled_setpoint / sampled_disturbance (history arrays)
+- `idx_wylosowany` / `idx_raport` / `idx_max_Q` → array index counters (for preallocation)
 
 **Visualization**:
 - Theme-neutral colors (RGB arrays, never 'w' or 'k')
 - Use `figure()` without Position for tabbed interface
 - Check variable existence: `exist()`, `isfield()`, `~isempty()`
 - Dynamic sizing: `size()`, `length()` instead of hardcoded dimensions
+
+**Mathematical Approaches**:
+- Prefer mathematical formulas over multi-branch conditionals when possible
+- Example: Divisor calculation in `m_reset.m` (lines 105-106)
+  - Old: 4-branch if-elseif chain checking thresholds (0.09, 0.9, 9, 99)
+  - New: `dzielnik = 10^ceil(max(0, log10(100/range)))`
+  - Benefits: Self-documenting intent, handles edge cases, no magic numbers
+  - **Bonus**: Fixed critical bug where range≥99 had no matching branch (undefined behavior)
+- Use logarithms, power functions, and ceiling/floor for scaling operations
+- Mathematical formulas often reveal edge case bugs in conditional logic
+- See `DIVISOR_LOGIC_ANALYSIS.md` for detailed case study
+
+**Error Handling**:
+- Use `error('message')` instead of `quit` for validation failures
+- Check variable existence with `exist()` before using optional features
+- Validate mutually exclusive flags (e.g., learning modes)
+- Validate input ranges (e.g., positive values where required)
+- Provide helpful error messages indicating how to fix the issue
+- Include current value in error messages for easier debugging
 
 **Verification Flow**:
 - First run (before learning): stores `logi_before_learning`
@@ -285,6 +400,22 @@ T = [5 2]; nr_modelu = 3; Ks = tf(1,[5 1])*tf(1,[2 1]);
 - Does NOT track disturbances (they show as deviations controllers must reject)
 
 **Multi-Model**: 8 models share same Q2d implementation (1st→3rd order, nonlinear)
+
+**Random Setpoint Generation**: Mathematical divisor calculation ensures consistent granularity
+- Goal: Provide ~100 discrete random values regardless of range magnitude
+- Formula: `dzielnik = 10^ceil(max(0, log10(100/range)))`
+- Automatically adapts from tiny ranges (0.01) to large ranges (100+)
+- Eliminates magic number thresholds and maintains code clarity
+
+**Episode Length Strategy** (Intentional Asymmetry):
+- **Load Disturbance Mode** (primary): Randomized episode length ~N(3000, 150)
+  - Prevents overfitting to fixed episode duration
+  - Improves robustness across different time horizons
+  - Primary mode for industrial applications
+- **Setpoint Change Mode** (legacy): Fixed episode length from config.m
+  - Provides manual control for specific testing scenarios
+  - Rarely used, benefits from predictable behavior
+  - Intentional design choice, not a bug
 
 ## Publications
 

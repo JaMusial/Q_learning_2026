@@ -63,6 +63,14 @@ end
 
 fprintf("\n Uczenie zakonczono na %d epokach, osiągnieto Te=%f\n\n", epoka, Te);
 
+%% Trim preallocated history arrays to actual used size
+% Remove unused preallocated space to save memory and improve plot performance
+wylosowany_SP = wylosowany_SP(1:idx_wylosowany);
+wylosowane_d = wylosowane_d(1:idx_wylosowany);
+czas_uczenia_wek = czas_uczenia_wek(1:idx_raport);
+proc_stab_wek = proc_stab_wek(1:idx_raport);
+max_macierzy_Q = max_macierzy_Q(1:idx_max_Q);
+
 % Trim preallocated log arrays to actual used size before visualization
 trim_logi = 1;
 m_zapis_logow;
