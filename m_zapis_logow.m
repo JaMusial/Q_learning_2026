@@ -11,7 +11,13 @@
 if reset_logi==1 || exist('logi','var') == 0
     % Preallocate arrays to maximum iteration size for performance
     % Round to integer since normrnd() can return float values
-    max_samples = round(maksymalna_ilosc_iteracji_uczenia);
+    % In single iteration mode: allocate for all epochs (logs accumulate)
+    % In verification mode: allocate for one epoch (logs reset each epoch)
+    if exist('poj_iteracja_uczenia', 'var') && poj_iteracja_uczenia == 1
+        max_samples = round(max_epoki * maksymalna_ilosc_iteracji_uczenia);
+    else
+        max_samples = round(maksymalna_ilosc_iteracji_uczenia);
+    end
 
     % Q-controller logs
     logi.Q_e = zeros(1, max_samples);

@@ -2,6 +2,8 @@ clear all
 close all
 clc
 
+%to do, brak rysowania przy poj iteracji uczenia
+
 format long
 
 %% Initialization

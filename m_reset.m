@@ -57,6 +57,8 @@ if exist('realizacja_traj_epoka_idx', 'var')
 end
 
 % Reset logging index for new epoch
-if exist('logi_idx', 'var')
+% NOTE: In single iteration mode, logs accumulate across all epochs to show full learning process
+% In verification mode, logs reset each epoch (only final epoch matters)
+if exist('logi_idx', 'var') && exist('poj_iteracja_uczenia', 'var') && poj_iteracja_uczenia == 0
     logi_idx = 0;
 end

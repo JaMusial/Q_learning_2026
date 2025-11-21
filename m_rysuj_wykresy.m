@@ -601,14 +601,26 @@ function plot_mnk_analysis(colors)
         return;
     end
 
-    figure()
+    % Check if required variables exist and are non-empty
+    if evalin('base', 'exist(''wek_proc_realizacji'', ''var'')') == 0 || ...
+       evalin('base', 'exist(''filtr_mnk'', ''var'')') == 0 || ...
+       evalin('base', 'exist(''wek_Te'', ''var'')') == 0
+        return;
+    end
 
-    % Learning progress metrics
-    subplot(4,1,1)
     wek_proc_realizacji = evalin('base', 'wek_proc_realizacji');
     filtr_mnk = evalin('base', 'filtr_mnk');
     wek_Te = evalin('base', 'wek_Te');
 
+    % Return if any are empty
+    if isempty(wek_proc_realizacji) || isempty(filtr_mnk) || isempty(wek_Te)
+        return;
+    end
+
+    figure()
+
+    % Learning progress metrics
+    subplot(4,1,1)
     plot(wek_proc_realizacji, 'Color', colors.Q, 'LineWidth', 1.5)
     hold on
     plot(filtr_mnk, 'Color', colors.Disturbance, 'LineWidth', 1.5)
