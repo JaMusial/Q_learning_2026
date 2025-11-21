@@ -21,3 +21,5 @@ profiler_test.m
 # OS files
 .DS_Store
 Thumbs.db
+# Log files
+*.json
