@@ -151,13 +151,19 @@ else
             m_losowanie_nowe
         end
 
+        % FIXED 2025-01-23: Don't update Q-values if exploration failed
+        % If constraint rejected random actions 10 times, fallback to exploitation
+        % but don't treat it as successful exploration for learning
         if ponowne_losowanie >= max_powtorzen_losowania_RD
             [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
+            uczenie = 0;        % Don't update Q-values (failed exploration = exploitation)
+            czy_losowanie = 0;  % Mark as exploitation for logging
+        else
+            uczenie = 1;        % Successful exploration - update Q-values
+            czy_losowanie = 1;  % Mark as exploration for logging
         end
 
         wart_akcji = akcje_sr(wyb_akcja);
-        uczenie = 1;
-        czy_losowanie = 1;
 
     elseif stan ~= 0
         % Exploitation: Select best action
