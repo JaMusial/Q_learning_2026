@@ -48,13 +48,22 @@ while epoka <= max_epoki
     iter = iter + 1;
 
     % Adaptive Te adjustment based on learning performance
-    if mean(a_mnk_mean) > 0.2 && mean(b_mnk_mean) > -0.05 && mean(b_mnk_mean) < 0.05 && ...
+    % Convergence criteria from config.m:
+    %   - mean(a_mnk_mean) > te_reduction_threshold_a: Upward trend in realization
+    %   - mean(b_mnk_mean) in [b_min, b_max]: Stable (not accelerating)
+    %   - flaga_zmiana_Te == 1: Window processing completed
+    %   - Te > Te_bazowe: Haven't reached goal time constant
+    if mean(a_mnk_mean) > te_reduction_threshold_a && ...
+            mean(b_mnk_mean) > te_reduction_threshold_b_min && ...
+            mean(b_mnk_mean) < te_reduction_threshold_b_max && ...
             flaga_zmiana_Te == 1 && epoka ~= 0 && Te > Te_bazowe
 
         Te = Te - 0.1;
-        filtr_mnk_mean = [0 0 0];
-        a_mnk_mean = [0 0 0 0 0 0 0 0];
-        b_mnk_mean = [100 100 100 100 100 100 100 100];
+
+        % Reset convergence tracking windows (use sizes from config.m)
+        filtr_mnk_mean = zeros(1, mnk_mean_window_size);
+        a_mnk_mean = zeros(1, mnk_coeff_a_window_size);
+        b_mnk_mean = ones(1, mnk_coeff_b_window_size) * 100;  % High initial value prevents premature reduction
         flaga_zmiana_Te = 0;
 
         [stany, akcje_sr, ilosc_stanow, ile_akcji, nr_stanu_doc, nr_akcji_doc] = ...
@@ -71,6 +80,12 @@ wylosowane_d = wylosowane_d(1:idx_wylosowany);
 czas_uczenia_wek = czas_uczenia_wek(1:idx_raport);
 proc_stab_wek = proc_stab_wek(1:idx_raport);
 max_macierzy_Q = max_macierzy_Q(1:idx_max_Q);
+
+% Trim trajectory realization arrays
+wek_proc_realizacji = wek_proc_realizacji(1:idx_realizacja);
+filtr_mnk = filtr_mnk(1:idx_realizacja);
+wsp_mnk = wsp_mnk(:, 1:idx_realizacja);
+wek_Te = wek_Te(1:idx_realizacja);
 
 % Trim preallocated log arrays to actual used size before visualization
 trim_logi = 1;

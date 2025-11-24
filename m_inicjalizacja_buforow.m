@@ -42,3 +42,14 @@ max_zapisow_Q = ceil(max_epoki / probkowanie_norma_macierzy) + SAFETY_MARGIN;
 max_macierzy_Q = zeros(1, max_zapisow_Q);
 max_macierzy_Q(1) = 1;  % Initialize first value
 idx_max_Q = 1;  % Start at 1 since first value already set
+
+% Arrays for trajectory realization tracking (m_realizacja_trajektorii_v2)
+% Window fills every ilosc_probek_procent_realizacjii iterations
+% Max iterations = max_epoki * mean_episode_length
+% Max windows = total_iterations / window_size
+max_realizacja_windows = ceil((max_epoki * mean_episode_length) / ilosc_probek_procent_realizacjii) + SAFETY_MARGIN;
+wek_proc_realizacji = zeros(1, max_realizacja_windows);  % Realization percentage history
+filtr_mnk = zeros(1, max_realizacja_windows);             % MNK filtered values
+wsp_mnk = zeros(3, max_realizacja_windows);               % MNK coefficients [a; b; c]
+wek_Te = zeros(1, max_realizacja_windows);                % Te value at each window
+idx_realizacja = 0;  % Index counter for trajectory realization arrays

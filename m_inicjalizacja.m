@@ -160,14 +160,14 @@ wek_okno_realizacji = zeros(1, 100);      % Realization window vector
 proc_realizacji_w_oknie = 0;      % Realization percentage in window
 probkowanie_var_iter = 0;          % Iteration sampling counter
 proc_realizacji_w_oknie_wek = [];  % Realization percentage vector
-okno_procent_realizacji = [];     % Percentage realization window
-wek_proc_realizacji = [];          % Realization percentage vector
+okno_procent_realizacji = [];     % Percentage realization window (dynamically grows, reset when full)
+wek_proc_realizacji = [];          % Realization percentage vector (grows every window, will be preallocated)
 srednia_okno_proc_realizacji = []; % Average realization window
-filtr_mnk = [];                    % Least squares filter
-wsp_mnk = [];                      % Least squares coefficients
-filtr_mnk_mean = [0 0 0];          % MNK filter mean
-a_mnk_mean = [0 0 0 0 0 0 0 0];    % MNK coefficient a (mean)
-b_mnk_mean = [100 100 100 100 100 100 100 100];  % MNK coefficient b (mean)
+filtr_mnk = [];                    % Least squares filter (grows every window, will be preallocated)
+wsp_mnk = [];                      % Least squares coefficients (grows every window, will be preallocated)
+filtr_mnk_mean = zeros(1, mnk_mean_window_size);          % MNK filter mean (sliding window)
+a_mnk_mean = zeros(1, mnk_coeff_a_window_size);           % MNK coefficient a (sliding window for mean)
+b_mnk_mean = ones(1, mnk_coeff_b_window_size) * 100;      % MNK coefficient b (initialized high to prevent early Te reduction)
 
 %% --- Trajectory & Performance Metrics ---
 proc_realizacji_traj = [0];        % Trajectory realization percentage

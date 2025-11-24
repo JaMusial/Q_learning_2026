@@ -9,7 +9,7 @@
 
 %% --- Simulation Control ---
 poj_iteracja_uczenia = 0;          % 1=single iteration mode, 0=full verification with metrics
-max_epoki = 2000;                    % Training duration (500 for testing, 5000+ for full training)
+max_epoki = 1500;                    % Training duration (500 for testing, 5000+ for full training)
 maksymalna_ilosc_iteracji_uczenia = 4000;  % Max samples per epoch
 czas_eksp_wer = 600;               % Verification experiment time [s]
 gif_on = 0;                        % 1=generate GIF animation, 0=disabled
@@ -56,7 +56,7 @@ k = 1;                             % Process gain
 % T = [2.34 1.55 9.38];              % Time constants [s] - adjust dimensions per model
 T=[5 2];
 T0 = 4;                            % Plant dead time (physical reality) [s]
-T0_controller = T0;                % Controller compensation dead time [s] (0=no compensation)
+T0_controller = 0;                % Controller compensation dead time [s] (0=no compensation)
 SP_ini = 50;                       % Initial setpoint [%]
 
 %% --- PI Controller Parameters ---
@@ -68,7 +68,7 @@ dt_PID = 0.1;                      % PI sampling time [s]
 
 %% --- Q-Learning Controller Parameters ---
 dt = 0.1;                          % Sampling time [s] (must equal dt_PID)
-Te_bazowe = 8;                     % Goal time constant [s]
+Te_bazowe = 10;                     % Goal time constant [s]
 kQ = Kp;                           % Q-controller gain (set to Kp for bumpless transfer)
 
 % Learning parameters
@@ -94,9 +94,22 @@ max_powtorzen_losowania_RD = 10;   % Max RD randomization attempts
 %% --- Convergence & Trajectory Tracking ---
 oczekiwana_ilosc_probek_stabulizacji = 20;  % Expected stabilization samples
 probkowanie_norma_macierzy = 100;           % Q-matrix norm sampling interval (epochs)
-ilosc_probek_procent_realizacjii = round(50 / dt);  % Trajectory realization window size
-przesuniecie_okno_procent_realizacji = round(ilosc_probek_procent_realizacjii / 4);  % Window shift
+ilosc_probek_procent_realizacjii = round(50 / dt);  % Trajectory realization window size [iterations]
+przesuniecie_okno_procent_realizacji = round(ilosc_probek_procent_realizacjii / 4);  % Window shift (unused)
 rozmiar_okna_sredniej_realizacji = 5;       % Moving average window size
+
+%% --- Trajectory Realization & Te Reduction ---
+% MNK (Least Squares) Filter Configuration
+mnk_filter_time_constant = 10;     % Recursive least-squares filter time constant [s]
+mnk_mean_window_size = 3;          % Sliding window size for filtered realization values
+mnk_coeff_a_window_size = 8;       % Sliding window size for coefficient 'a' (level)
+mnk_coeff_b_window_size = 8;       % Sliding window size for coefficient 'b' (trend)
+
+% Te Reduction Convergence Criteria
+% Te is reduced by 0.1s when learning performance stabilizes
+te_reduction_threshold_a = 0.2;    % Min mean(a) for upward trend detection (0-1 scale)
+te_reduction_threshold_b_min = -0.05;  % Min mean(b) for stable trend (near-zero derivative)
+te_reduction_threshold_b_max = 0.05;   % Max mean(b) for stable trend (near-zero derivative)
 
 %% --- Scaling Parameters ---
 % Process variable ranges (engineering units / percentage)
