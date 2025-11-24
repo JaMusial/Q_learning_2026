@@ -376,7 +376,21 @@ analyze_debug_logs
 
 **Verification**: Compatible with m_rysuj_wykresy.m visualization (metrics stored as [N x 3] arrays)
 
-**Separate Issue Identified**: m_eksperyment_weryfikacyjny.m:63 has dimensional inconsistency (mixes time in seconds with sample count) - does not affect f_licz_wskazniki but may cause timing issues in verification experiments.
+**m_eksperyment_weryfikacyjny.m** - Verification experiment script refactored:
+
+**Bug Fixed**:
+- **Dimensional inconsistency**: Disturbance timing mixed time [seconds] with sample count
+  - Impact: Incorrect phase boundaries, disturbance applied at wrong times
+  - Fix: Phase boundaries now calculated in consistent time units [seconds]
+  - Old: `t > dlugosc_symulacji*dt/3 + ilosc_probek_sterowanie_reczne` (mixed units)
+  - New: `t > manual_control_time + czas_eksp_wer/3` (all in seconds)
+
+**Improvements**:
+- Comprehensive header documentation (PURPOSE, INPUTS, OUTPUTS, NOTES, SIDE EFFECTS)
+- Section dividers for code organization
+- Named phase boundary variables for clarity (`phase2_start_time`, `phase2_end_time`)
+- Explicit comment documenting units: "in time [seconds], not samples"
+- Simplified disturbance logic (removed redundant else branch)
 
 ### Next Steps
 
@@ -384,7 +398,7 @@ analyze_debug_logs
 2. Run longer training (2000 epochs) for full convergence
 3. Test robustness with other T0 values (1, 2, 6)
 4. Re-run all experiments from before 2025-01-23
-5. Consider fixing dimensional inconsistency in m_eksperyment_weryfikacyjny.m:63
+5. ✅ Fixed dimensional inconsistency in m_eksperyment_weryfikacyjny.m (2025-01-24)
 
 ---
 

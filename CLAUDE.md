@@ -264,7 +264,8 @@ Models 2,4 deprecated. Dead time: Add T0 > 0 (external delay).
 - `m_inicjalizacja_buforov.m`: Array preallocation with proper sizing, index counters for performance, named constants
 - `main.m`: Added array trimming after training loop
 - `f_generuj_stany_v2.m`: Removed dead code (compensation model p=0), array preallocation for performance, comprehensive documentation explaining `precision*2/Te` formula and Te-invariant error tolerance, magic numbers explained
-- `f_licz_wskazniki.m`: English variable names, comprehensive documentation with 3-phase experiment structure, vectorized calculations (time array, max_delta_u, max_overshoot), removed all dead code (25+ lines), replaced hardcoded timesteps with dt parameter, array preallocation, unified max overshoot logic
+- `f_licz_wskazniki.m`: English variable names, comprehensive documentation with 3-phase experiment structure, vectorized calculations (time array, max_delta_u, max_overshoot), removed all dead code (25+ lines), replaced hardcoded timesteps with dt parameter, array preallocation, unified max overshoot logic, **fixed phase boundary bug** and time array length bug
+- `m_eksperyment_weryfikacyjny.m`: Comprehensive header documentation (PURPOSE, INPUTS, OUTPUTS, NOTES, SIDE EFFECTS), section dividers, **fixed dimensional inconsistency bug** in disturbance timing (mixed time[s] with samples), phase boundaries now correctly calculated in time units
 - `test_divisor_logic.m`: Verification script for divisor calculation (14 test cases, identifies 2 bug fixes)
 - `DIVISOR_LOGIC_ANALYSIS.md`: Detailed explanation of bug fixes and formula derivation
 
