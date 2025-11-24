@@ -1,6 +1,7 @@
 clear all
 close all
 clc
+rng(1)
 
 %to do, brak rysowania przy poj iteracji uczenia
 
@@ -15,7 +16,7 @@ Te = Ti;
 % Generate state and action spaces
 [stany, akcje_sr, ilosc_stanow, ile_akcji, nr_stanu_doc, nr_akcji_doc] = ...
     f_generuj_stany_v2(dokladnosc_gen_stanu, oczekiwana_ilosc_stanow, ograniczenie_sterowania_gora, Te, Kp, dt);
-
+ 
 % Initialize Q-learning matrix
 [Q_2d, Q_2d_old] = f_generuj_macierz_Q_2d(ilosc_stanow+1, ile_akcji, nagroda, gamma);
 Q_2d_save = Q_2d;

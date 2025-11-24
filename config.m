@@ -9,10 +9,15 @@
 
 %% --- Simulation Control ---
 poj_iteracja_uczenia = 0;          % 1=single iteration mode, 0=full verification with metrics
-max_epoki = 5000;                    % Training duration (500 for testing, 5000+ for full training)
+max_epoki = 2000;                    % Training duration (500 for testing, 5000+ for full training)
 maksymalna_ilosc_iteracji_uczenia = 4000;  % Max samples per epoch
 czas_eksp_wer = 600;               % Verification experiment time [s]
 gif_on = 0;                        % 1=generate GIF animation, 0=disabled
+
+%% --- Debug Logging ---
+% Enables detailed Q-learning diagnostics in logi.DEBUG_* fields
+% WARNING: Adds computational overhead (~10-15%), use only for debugging
+debug_logging = 0;                 % 1=enable detailed debug logs, 0=disabled (default: 0 for production)
 
 %% --- Learning Mode ---
 uczenie_obciazeniowe = 1;          % 1=learn with disturbances, 0=setpoint changes (mutually exclusive)
@@ -46,11 +51,11 @@ long_run_interval = 1000;          % Reporting interval for long runs [epochs]
 %   7 - Second order oscillatory         T: [T1, T2, T3] (tested for T=[5 2 1])
 %   8 - Third order pneumatic            T: [T1, T2, T3] (example: T=[2.34 1.55 9.38])
 
-nr_modelu = 1;                     % Model selection (1, 3, 5, 6, 7, 8)
+nr_modelu = 3;                     % Model selection (1, 3, 5, 6, 7, 8)
 k = 1;                             % Process gain
-%T = [2.34 1.55 9.38];              % Time constants [s] - adjust dimensions per model
-T=[5];
-T0 = 0;                            % Plant dead time (physical reality) [s]
+% T = [2.34 1.55 9.38];              % Time constants [s] - adjust dimensions per model
+T=[5 2];
+T0 = 4;                            % Plant dead time (physical reality) [s]
 T0_controller = T0;                % Controller compensation dead time [s] (0=no compensation)
 SP_ini = 50;                       % Initial setpoint [%]
 
@@ -63,7 +68,7 @@ dt_PID = 0.1;                      % PI sampling time [s]
 
 %% --- Q-Learning Controller Parameters ---
 dt = 0.1;                          % Sampling time [s] (must equal dt_PID)
-Te_bazowe = 2;                     % Goal time constant [s]
+Te_bazowe = 8;                     % Goal time constant [s]
 kQ = Kp;                           % Q-controller gain (set to Kp for bumpless transfer)
 
 % Learning parameters

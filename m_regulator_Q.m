@@ -43,11 +43,18 @@ if iter <= ilosc_probek_sterowanie_reczne
     wart_akcji = akcje_sr(wyb_akcja);
     uczenie = 0;
     czy_losowanie = 0;
+    R = 0;  % No reward during manual control phase
+
+    % Initialize old_R for first iteration after manual control
+    if ~exist('old_R', 'var')
+        old_R = 0;
+    end
 
     % Fill buffers during manual control but don't use buffered output (initially zeros)
     if T0_controller > 0
         [~, bufor_state] = f_bufor(stan, bufor_state);
         [~, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);
+        [~, bufor_uczenie] = f_bufor(uczenie, bufor_uczenie);
     end
 
     stan_value_ref = de_ref + 1/Te * e_ref;
@@ -83,6 +90,82 @@ else
     old_state = stan;
     stan = f_find_state(stan_value, stany);
 
+    %% ========================================================================
+    %% Save previous iteration's action, learning flag, and reward
+    %% ========================================================================
+    % CRITICAL FIX 2025-01-23: For T0_controller=0, we need to pair old_state
+    % with the action AND reward that were ACTUALLY from that state (from previous iteration)
+    old_wyb_akcja = wyb_akcja;
+    old_uczenie = uczenie;
+    old_R = R;
+
+    %% ========================================================================
+    %% Action selection for CURRENT state (BEFORE buffering)
+    %% ========================================================================
+    % CRITICAL FIX 2025-01-23: Action selection MUST happen before buffering
+    % to ensure state-action pairs are correctly matched when buffered together.
+    % Previous bug: wyb_akcja from iteration k-1 was buffered with stan from k.
+
+    % Get best actions from neighboring states
+    if stan + 1 > ilosc_stanow
+        wyb_akcja_above = wyb_akcja;
+    else
+        [Q_value_state_above, wyb_akcja_above] = f_best_action_in_state(Q_2d, stan+1, nr_akcji_doc);
+    end
+
+    if stan - 1 < 1
+        wyb_akcja_under = wyb_akcja;
+    else
+        [Q_value_state_under, wyb_akcja_under] = f_best_action_in_state(Q_2d, stan-1, nr_akcji_doc);
+    end
+
+    % If in target state, select target action
+    if (stan == nr_stanu_doc)
+        wyb_akcja = nr_akcji_doc;
+        R = nagroda;  % Reward for current state (used for logging)
+        wart_akcji = akcje_sr(wyb_akcja);
+        uczenie = 1;
+        czy_losowanie = 0;
+
+        % Otherwise, use epsilon-greedy policy
+    else
+        R = 0;  % Reward for current state (used for logging)
+
+        if eps >= a
+            % Exploration: Random action selection with constraints
+            ponowne_losowanie = 1;
+            while ponowne_losowanie > 0 && ponowne_losowanie <= max_powtorzen_losowania_RD
+                m_losowanie_nowe
+            end
+
+            % FIXED 2025-01-23: Don't update Q-values if exploration failed
+            % If constraint rejected random actions 10 times, fallback to exploitation
+            % but don't treat it as successful exploration for learning
+            if ponowne_losowanie >= max_powtorzen_losowania_RD
+                [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
+                uczenie = 0;        % Don't update Q-values (failed exploration = exploitation)
+                czy_losowanie = 0;  % Mark as exploitation for logging
+            else
+                uczenie = 1;        % Successful exploration - update Q-values
+                czy_losowanie = 1;  % Mark as exploration for logging
+            end
+
+            wart_akcji = akcje_sr(wyb_akcja);
+
+        elseif stan ~= 0
+            % Exploitation: Select best action
+            [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
+            wart_akcji = akcje_sr(wyb_akcja);
+            uczenie = 0;
+            czy_losowanie = 0;
+        end
+    end
+
+    %% ========================================================================
+    %% Delayed credit assignment (buffer state-action pairs)
+    %% ========================================================================
+    % NOW buffer the correctly matched (stan, wyb_akcja) pair
+
     if T0_controller > 0
         % Buffer current state and action for delayed credit assignment
         [old_stan_T0, bufor_state] = f_bufor(stan, bufor_state);
@@ -92,88 +175,59 @@ else
         % Use CURRENT state as next state (effect is visible now)
         stan_T0 = stan;
 
-        if old_stan_T0 == nr_stanu_doc
-            R = 1;
+        % CRITICAL FIX 2025-01-23 (Bug #6): Bootstrap override to prevent drift contamination
+        % Problem: When goal state + goal action selected, next state SHOULD be goal (by design)
+        % But numerical drift over T0_controller/dt iterations causes next state to be 49 or 51
+        % This contaminates bootstrap with lower Q-values, pulling Q(50,50) DOWN instead of UP
+        % Solution: Override next state to goal for bootstrap calculation when goal→goal intended
+        if old_stan_T0 == nr_stanu_doc && wyb_akcja_T0 == nr_akcji_doc
+            stan_T0_for_bootstrap = nr_stanu_doc;  % Override: goal action should keep at goal
         else
-            R = 0;
+            stan_T0_for_bootstrap = stan_T0;  % Use actual next state
+        end
+
+        % Reward logic for goal-reaching with disturbances and dead time:
+        % We need to ensure Q(goal_state, goal_action) remains the highest value!
+        % Two cases for R=1:
+        % 1. Arriving at goal state (stan_T0 == goal) - rewards transitions TO goal
+        % 2. Being in goal WITH goal action (old_stan_T0 == goal AND wyb_akcja_T0 == goal_action)
+        %    - ensures Q(goal,goal_action) stays maximum even with disturbances
+        if stan_T0 == nr_stanu_doc || (old_stan_T0 == nr_stanu_doc && wyb_akcja_T0 == nr_akcji_doc)
+            R_buffered = 1;
+        else
+            R_buffered = 0;
         end
     else
+        % No dead time compensation: standard one-step Q-learning
+        % CRITICAL FIX 2025-01-23: Pair old_state with old_wyb_akcja AND old_R (from same iteration)
+        % to maintain correct Q-learning semantics: Q(s_k-1, a_k-1) updated with R_k-1 using s_k
         stan_T0 = stan;
+        stan_T0_for_bootstrap = stan_T0;  % No override needed for T0=0 (minimal drift)
         old_stan_T0 = old_state;
-        wyb_akcja_T0 = wyb_akcja;
-        uczenie_T0 = uczenie;
+        wyb_akcja_T0 = old_wyb_akcja;  % Action from SAME iteration as old_state
+        uczenie_T0 = old_uczenie;      % Learning flag from SAME iteration as old_state
+        R_buffered = old_R;            % Reward from SAME iteration as old_state (CRITICAL FIX!)
     end
 
     stan_value_ref = de_ref + 1/Te * e_ref;
     stan_nr_ref = f_find_state(stan_value_ref, stany);
 
-    maxS = max(Q_2d(stan_T0, :));
+    % CRITICAL FIX 2025-01-23 (Bug #6): Use stan_T0_for_bootstrap (not stan_T0) for max calculation
+    % This prevents bootstrap contamination when goal state drifts to adjacent states
+    maxS = max(Q_2d(stan_T0_for_bootstrap, :));
     maxS_ref = max(Q_2d(stan_nr_ref, :));
 
-    % Q-learning update rule
-    if uczenie == 1 && pozwolenie_na_uczenia == 1 && stan_T0 ~= 0 && old_stan_T0 ~= 0
-        Q_update = alfa * (R + gamma * maxS - Q_2d(old_stan_T0, wyb_akcja_T0));
+    %% ========================================================================
+    %% Q-learning update
+    %% ========================================================================
+    % Update Q-value for the BUFFERED state-action pair
+    if uczenie_T0 == 1 && pozwolenie_na_uczenia == 1 && stan_T0_for_bootstrap ~= 0 && old_stan_T0 ~= 0
+        Q_update = alfa * (R_buffered + gamma * maxS - Q_2d(old_stan_T0, wyb_akcja_T0));
         Q_2d(old_stan_T0, wyb_akcja_T0) = Q_2d(old_stan_T0, wyb_akcja_T0) + Q_update;
     end
 end
 
-%% Action selection
-
-% Get best actions from neighboring states
-if stan + 1 > ilosc_stanow
-    wyb_akcja_above = wyb_akcja;
-else
-    [Q_value_state_above, wyb_akcja_above] = f_best_action_in_state(Q_2d, stan+1, nr_akcji_doc);
-end
-
-if stan - 1 < 1
-    wyb_akcja_under = wyb_akcja;
-else
-    [Q_value_state_under, wyb_akcja_under] = f_best_action_in_state(Q_2d, stan-1, nr_akcji_doc);
-end
-
-% If in target state, select target action
-if (stan == nr_stanu_doc)
-    wyb_akcja = nr_akcji_doc;
-    R = nagroda;
-    wart_akcji = akcje_sr(wyb_akcja);
-    uczenie = 1;
-    czy_losowanie = 0;
-
-    % Otherwise, use epsilon-greedy policy
-else
-    R = 0;
-
-    if eps >= a
-        % Exploration: Random action selection with constraints
-        ponowne_losowanie = 1;
-        while ponowne_losowanie > 0 && ponowne_losowanie <= max_powtorzen_losowania_RD
-            m_losowanie_nowe
-        end
-
-        % FIXED 2025-01-23: Don't update Q-values if exploration failed
-        % If constraint rejected random actions 10 times, fallback to exploitation
-        % but don't treat it as successful exploration for learning
-        if ponowne_losowanie >= max_powtorzen_losowania_RD
-            [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
-            uczenie = 0;        % Don't update Q-values (failed exploration = exploitation)
-            czy_losowanie = 0;  % Mark as exploitation for logging
-        else
-            uczenie = 1;        % Successful exploration - update Q-values
-            czy_losowanie = 1;  % Mark as exploration for logging
-        end
-
-        wart_akcji = akcje_sr(wyb_akcja);
-
-    elseif stan ~= 0
-        % Exploitation: Select best action
-        [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
-        wart_akcji = akcje_sr(wyb_akcja);
-        uczenie = 0;
-        czy_losowanie = 0;
-    end
-end
-% Store trajectory realization for analysis
+% Store trajectory realization for analysis (uses current state reward)
 if eks_wer == 0
     realizacja_traj_epoka_idx = realizacja_traj_epoka_idx + 1;
     realizacja_traj_epoka(realizacja_traj_epoka_idx) = R;

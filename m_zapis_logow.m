@@ -43,6 +43,31 @@ if reset_logi==1 || exist('logi','var') == 0
     logi.Q_maxS = zeros(1, max_samples);
     logi.Q_table_update = zeros(1, max_samples);
 
+    % DEBUG: Detailed Q-learning diagnostics (enabled via debug_logging in config.m)
+    % Only initialize DEBUG fields if debug_logging is enabled
+    if exist('debug_logging', 'var') && debug_logging == 1
+        logi.DEBUG_old_state = zeros(1, max_samples);           % State from previous iteration
+        logi.DEBUG_old_action = zeros(1, max_samples);          % Action from previous iteration
+        logi.DEBUG_old_R = zeros(1, max_samples);               % Reward from previous iteration
+        logi.DEBUG_old_uczenie = zeros(1, max_samples);         % Learning flag from previous iteration
+        logi.DEBUG_stan_T0 = zeros(1, max_samples);             % Next state for Q-update (actual, may have drift)
+        logi.DEBUG_stan_T0_for_bootstrap = zeros(1, max_samples); % Next state for bootstrap (override if goal->goal)
+        logi.DEBUG_old_stan_T0 = zeros(1, max_samples);         % State being updated (buffered or old_state)
+        logi.DEBUG_wyb_akcja_T0 = zeros(1, max_samples);        % Action being updated (buffered or old_action)
+        logi.DEBUG_uczenie_T0 = zeros(1, max_samples);          % Learning flag for update (buffered or old)
+        logi.DEBUG_R_buffered = zeros(1, max_samples);          % Reward used in Q-update
+        logi.DEBUG_Q_old_value = zeros(1, max_samples);         % Q-value before update
+        logi.DEBUG_Q_new_value = zeros(1, max_samples);         % Q-value after update
+        logi.DEBUG_bootstrap = zeros(1, max_samples);           % γ·max(Q(s',:)) term
+        logi.DEBUG_TD_error = zeros(1, max_samples);            % R + γ·max(Q(s',:)) - Q(s,a)
+        logi.DEBUG_global_max_Q = zeros(1, max_samples);        % Maximum Q-value in entire table
+        logi.DEBUG_global_max_state = zeros(1, max_samples);    % State with maximum Q-value
+        logi.DEBUG_global_max_action = zeros(1, max_samples);   % Action with maximum Q-value
+        logi.DEBUG_goal_Q = zeros(1, max_samples);              % Q(goal_state, goal_action)
+        logi.DEBUG_is_goal_state = zeros(1, max_samples);       % 1 if current state is goal
+        logi.DEBUG_is_updating_goal = zeros(1, max_samples);    % 1 if updating goal state Q-value
+    end
+
     % Reference trajectory logs
     logi.Ref_e = zeros(1, max_samples);
     logi.Ref_y = zeros(1, max_samples);
@@ -99,6 +124,78 @@ if zapis_logi==1
     logi.Q_maxS(logi_idx) = maxS;
     logi.Q_table_update(logi_idx) = Q_update;
 
+    % DEBUG: Populate detailed Q-learning diagnostics (if debug_logging enabled)
+    if exist('debug_logging', 'var') && debug_logging == 1
+        % Previous iteration values
+        if exist('old_state', 'var')
+            logi.DEBUG_old_state(logi_idx) = old_state;
+        end
+        if exist('old_wyb_akcja', 'var')
+            logi.DEBUG_old_action(logi_idx) = old_wyb_akcja;
+        end
+        if exist('old_R', 'var')
+            logi.DEBUG_old_R(logi_idx) = old_R;
+        end
+        if exist('old_uczenie', 'var')
+            logi.DEBUG_old_uczenie(logi_idx) = old_uczenie;
+        end
+
+        % Buffered/selected values for Q-update
+        if exist('stan_T0', 'var')
+            logi.DEBUG_stan_T0(logi_idx) = stan_T0;
+        end
+        if exist('stan_T0_for_bootstrap', 'var')
+            logi.DEBUG_stan_T0_for_bootstrap(logi_idx) = stan_T0_for_bootstrap;
+        end
+        if exist('old_stan_T0', 'var')
+            logi.DEBUG_old_stan_T0(logi_idx) = old_stan_T0;
+        end
+        if exist('wyb_akcja_T0', 'var')
+            logi.DEBUG_wyb_akcja_T0(logi_idx) = wyb_akcja_T0;
+        end
+        if exist('uczenie_T0', 'var')
+            logi.DEBUG_uczenie_T0(logi_idx) = uczenie_T0;
+        end
+        if exist('R_buffered', 'var')
+            logi.DEBUG_R_buffered(logi_idx) = R_buffered;
+        end
+
+        % Q-value tracking (only if Q-update happened)
+        % CRITICAL FIX 2025-01-23 (Bug #6): Use stan_T0_for_bootstrap to match Q-update condition
+        if exist('uczenie_T0', 'var') && exist('old_stan_T0', 'var') && exist('wyb_akcja_T0', 'var') && ...
+           exist('stan_T0_for_bootstrap', 'var') && ...
+           uczenie_T0 == 1 && pozwolenie_na_uczenia == 1 && stan_T0_for_bootstrap ~= 0 && old_stan_T0 ~= 0
+            % Q-value before update (calculated before Q_update was applied)
+            logi.DEBUG_Q_old_value(logi_idx) = Q_2d(old_stan_T0, wyb_akcja_T0) - Q_update;
+            % Q-value after update (current value)
+            logi.DEBUG_Q_new_value(logi_idx) = Q_2d(old_stan_T0, wyb_akcja_T0);
+            % Bootstrap term
+            if exist('gamma', 'var') && exist('maxS', 'var')
+                logi.DEBUG_bootstrap(logi_idx) = gamma * maxS;
+            end
+            % TD error
+            if exist('R_buffered', 'var') && exist('gamma', 'var') && exist('maxS', 'var')
+                logi.DEBUG_TD_error(logi_idx) = R_buffered + gamma * maxS - (Q_2d(old_stan_T0, wyb_akcja_T0) - Q_update);
+            end
+        end
+
+        % Global Q-table statistics
+        [max_Q, max_idx] = max(Q_2d(:));
+        [max_state, max_action] = ind2sub(size(Q_2d), max_idx);
+        logi.DEBUG_global_max_Q(logi_idx) = max_Q;
+        logi.DEBUG_global_max_state(logi_idx) = max_state;
+        logi.DEBUG_global_max_action(logi_idx) = max_action;
+
+        % Goal state tracking
+        if exist('nr_stanu_doc', 'var') && exist('nr_akcji_doc', 'var')
+            logi.DEBUG_goal_Q(logi_idx) = Q_2d(nr_stanu_doc, nr_akcji_doc);
+            logi.DEBUG_is_goal_state(logi_idx) = (stan == nr_stanu_doc);
+            if exist('old_stan_T0', 'var')
+                logi.DEBUG_is_updating_goal(logi_idx) = (old_stan_T0 == nr_stanu_doc && uczenie_T0 == 1);
+            end
+        end
+    end
+
     logi.Ref_e(logi_idx) = e_ref;
     logi.Ref_y(logi_idx) = y_ref;
     logi.Ref_de(logi_idx) = de_ref;
@@ -146,6 +243,41 @@ if exist('trim_logi', 'var') && trim_logi == 1
     logi.Q_czas_zaklocenia = logi.Q_czas_zaklocenia(1:logi_idx);
     logi.Q_maxS = logi.Q_maxS(1:logi_idx);
     logi.Q_table_update = logi.Q_table_update(1:logi_idx);
+
+    % Trim DEBUG logs (if they exist and logi_idx is within bounds)
+    if isfield(logi, 'DEBUG_old_state')
+        % CRITICAL FIX 2025-01-23: Check bounds before trimming
+        % During verification experiment, logi_idx can exceed original DEBUG array size
+        % Only trim if logi_idx is within the allocated array size
+        debug_array_size = length(logi.DEBUG_old_state);
+        if logi_idx <= debug_array_size
+            logi.DEBUG_old_state = logi.DEBUG_old_state(1:logi_idx);
+            logi.DEBUG_old_action = logi.DEBUG_old_action(1:logi_idx);
+            logi.DEBUG_old_R = logi.DEBUG_old_R(1:logi_idx);
+            logi.DEBUG_old_uczenie = logi.DEBUG_old_uczenie(1:logi_idx);
+            logi.DEBUG_stan_T0 = logi.DEBUG_stan_T0(1:logi_idx);
+            logi.DEBUG_stan_T0_for_bootstrap = logi.DEBUG_stan_T0_for_bootstrap(1:logi_idx);
+            logi.DEBUG_old_stan_T0 = logi.DEBUG_old_stan_T0(1:logi_idx);
+            logi.DEBUG_wyb_akcja_T0 = logi.DEBUG_wyb_akcja_T0(1:logi_idx);
+            logi.DEBUG_uczenie_T0 = logi.DEBUG_uczenie_T0(1:logi_idx);
+            logi.DEBUG_R_buffered = logi.DEBUG_R_buffered(1:logi_idx);
+            logi.DEBUG_Q_old_value = logi.DEBUG_Q_old_value(1:logi_idx);
+            logi.DEBUG_Q_new_value = logi.DEBUG_Q_new_value(1:logi_idx);
+            logi.DEBUG_bootstrap = logi.DEBUG_bootstrap(1:logi_idx);
+            logi.DEBUG_TD_error = logi.DEBUG_TD_error(1:logi_idx);
+            logi.DEBUG_global_max_Q = logi.DEBUG_global_max_Q(1:logi_idx);
+            logi.DEBUG_global_max_state = logi.DEBUG_global_max_state(1:logi_idx);
+            logi.DEBUG_global_max_action = logi.DEBUG_global_max_action(1:logi_idx);
+            logi.DEBUG_goal_Q = logi.DEBUG_goal_Q(1:logi_idx);
+            logi.DEBUG_is_goal_state = logi.DEBUG_is_goal_state(1:logi_idx);
+            logi.DEBUG_is_updating_goal = logi.DEBUG_is_updating_goal(1:logi_idx);
+        else
+            % logi_idx exceeds DEBUG array size (verification experiment)
+            % Keep DEBUG arrays as-is from training phase (don't trim)
+            % This happens when debug_logging was enabled for training but
+            % verification experiment runs longer than training episodes
+        end
+    end
 
     % Trim reference logs
     logi.Ref_e = logi.Ref_e(1:logi_idx);
