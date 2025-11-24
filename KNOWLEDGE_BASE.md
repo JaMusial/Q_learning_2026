@@ -296,9 +296,6 @@ diagnose_q_table
 
 % Comprehensive analysis
 analyze_debug_logs
-
-% Goal state transitions (Python)
-python3 investigate_goal_state_transitions.py
 ```
 
 ### Performance
@@ -322,7 +319,6 @@ python3 investigate_goal_state_transitions.py
 **Analysis tools** (new):
 - `diagnose_q_table.m` - Quick Q-table check (MATLAB)
 - `analyze_debug_logs.m` - Comprehensive analysis (MATLAB)
-- `investigate_goal_state_transitions.py` - Goal transitions (Python)
 
 ### Bug Status Summary
 
@@ -397,8 +393,8 @@ Q_2d(50, :)  % Should see: [0 0 ... 100 ... 0 0]
 sum(logi.DEBUG_R_buffered ~= logi.DEBUG_old_R)  % Should be 0
 
 % Bug #5 (T0>0): Bootstrap contamination?
-% In Python:
-python3 investigate_goal_state_transitions.py
+% Check bootstrap override effectiveness in debug logs
+analyze_debug_logs
 ```
 
 ---
