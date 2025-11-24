@@ -348,12 +348,43 @@ analyze_debug_logs
 - Goal→Goal: ~100% (override active)
 - TD error: Decreasing
 
+### Code Quality Improvements (2025-01-24)
+
+**f_licz_wskazniki.m** - Performance metrics calculation refactored:
+
+**Bugs Fixed**:
+1. **Phase boundary bug**: Phase indices didn't account for manual control samples
+   - Impact: Metrics calculated on wrong data ranges
+   - Fix: All phase boundaries now offset by `manual_control_samples`
+2. **Time array length bug**: Array size mismatch caused indexing errors
+   - Impact: Settling time calculation could fail
+   - Fix: `time = (0:total_samples-1) * dt` matches data array length
+
+**Improvements**:
+- English variable names (Polish → English for maintainability)
+- Comprehensive documentation (PURPOSE, INPUTS, OUTPUTS, NOTES)
+- Vectorized calculations (time array, max_delta_u, max_overshoot)
+- Removed 25+ lines of dead/commented code
+- Array preallocation for all outputs
+- Eliminated hardcoded timesteps (replaced `0.1` with `dt` parameter)
+- Unified max overshoot logic across all phases
+
+**3-Phase Structure** (matches m_eksperyment_weryfikacyjny.m):
+- Phase 1: SP change (setpoint step response)
+- Phase 2: Disturbance rejection (d=0.3 applied)
+- Phase 3: Recovery (disturbance removed)
+
+**Verification**: Compatible with m_rysuj_wykresy.m visualization (metrics stored as [N x 3] arrays)
+
+**Separate Issue Identified**: m_eksperyment_weryfikacyjny.m:63 has dimensional inconsistency (mixes time in seconds with sample count) - does not affect f_licz_wskazniki but may cause timing issues in verification experiments.
+
 ### Next Steps
 
 1. ⏳ Verify Bug #5 fix with T0=4, 50 epochs
 2. Run longer training (2000 epochs) for full convergence
 3. Test robustness with other T0 values (1, 2, 6)
 4. Re-run all experiments from before 2025-01-23
+5. Consider fixing dimensional inconsistency in m_eksperyment_weryfikacyjny.m:63
 
 ---
 
