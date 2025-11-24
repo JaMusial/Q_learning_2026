@@ -263,6 +263,7 @@ Models 2,4 deprecated. Dead time: Add T0 > 0 (external delay).
 - `m_warunek_stopu.m`: Eliminated code duplication, unified progress reporting, English comments, indexed array access, uses parameters from config.m
 - `m_inicjalizacja_buforov.m`: Array preallocation with proper sizing, index counters for performance, named constants
 - `main.m`: Added array trimming after training loop
+- `f_generuj_stany_v2.m`: Removed dead code (compensation model p=0), array preallocation for performance, comprehensive documentation explaining `precision*2/Te` formula and Te-invariant error tolerance, magic numbers explained
 - `test_divisor_logic.m`: Verification script for divisor calculation (14 test cases, identifies 2 bug fixes)
 - `DIVISOR_LOGIC_ANALYSIS.md`: Detailed explanation of bug fixes and formula derivation
 
@@ -391,8 +392,20 @@ T = [5 2]; nr_modelu = 3; Ks = tf(1,[5 1])*tf(1,[2 1]);
 
 **Staged Learning**: Te reduction preserves Q-matrix while regenerating state/action spaces
 - Small 0.1s steps prevent catastrophic forgetting
-- `precision*2/Te` scaling maintains accuracy
+- `precision*2/Te` scaling maintains accuracy (see State Space Generation below)
 - Continued learning adapts Q-values naturally
+
+**State Space Generation**: Geometric distribution with Te-invariant precision
+- **Smallest action**: `precision * 2 / Te`
+- **States**: Midpoints between actions → smallest state = `precision / Te`
+- **Mathematical proof of ±precision tolerance**:
+  - State value: `s = de + (1/Te)·e`
+  - In steady state (de=0): `s = e/Te`
+  - Goal state boundaries: `(-precision/Te, +precision/Te]`
+  - Condition: `-precision/Te < e/Te ≤ +precision/Te`
+  - **Result**: `-precision < e ≤ +precision` (Te cancels!)
+- **Key insight**: As Te changes during staged learning (20→2), state boundaries scale proportionally, but state value also scales by 1/Te, maintaining constant ±precision error tolerance
+- **Performance**: Arrays preallocated for efficiency (avoid incremental growth)
 
 **Reference Trajectory**: Always uses Te_bazowe (not current Te)
 - Shows final performance goal consistently
