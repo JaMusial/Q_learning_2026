@@ -67,15 +67,19 @@ Guidance for Claude Code when working with this Q2d Q-learning controller reposi
 - Reference trajectory: Uses Te_bazowe (goal) for consistent visualization
 - Learning disabled when control saturates
 
-**Projection Function** (2025-01-28 clarification):
-- **Current approach** (`f_rzutujaca_on=0`, **recommended**): Disabled, uses staged learning instead
-  - Te starts at Ti (bumpless switching), reduces gradually to Te_bazowe
+**Projection Function** (2025-01-28 experimental validation):
+- **Current approach** (`f_rzutujaca_on=0`, **RECOMMENDED**): Projection disabled, uses staged learning instead
+  - Te starts at Ti (bumpless switching), reduces gradually to Te_bazowe in 0.1s steps
   - Better empirical performance, smoother convergence
-- **Paper version** (`f_rzutujaca_on=1`, for comparison): Enabled with fixed Te
-  - Te = Te_bazowe from start (immediate goal, large initial transient)
-  - Projection term applied: `wart_akcji -= e·(1/Te - 1/Ti)`
-  - As described in 2022 paper Eq. 6-7 (but implemented differently - see PROJECTION_ANALYSIS.md)
-- See `PROJECTION_COMPARISON_GUIDE.md` for experimental comparison protocol
+  - **Proven to work correctly**
+- **Paper version** (`f_rzutujaca_on=1`, **DO NOT USE**): Projection enabled with fixed Te
+  - Te = Te_bazowe from start (immediate goal, large 10× Te-Ti mismatch)
+  - Projection term: `wart_akcji -= e·(1/Te - 1/Ti)` applied to control
+  - **EXPERIMENTAL FAILURE (1000 epochs)**: Output stuck at 44.89% (target: 100%), error 5.11%, limit cycle between 2 states
+  - **Root cause**: Projection magnitude (e·0.45) overwhelms Q-learning, wrong control direction for large errors
+  - **Conclusion**: Projection function fundamentally flawed for large Te-Ti mismatches
+
+**Key Finding**: Staged learning eliminates need for projection by maintaining small Te-Ti difference. Projection cannot compensate for 10× mismatch and corrupts Q-learning process.
 
 ## Dead Time Compensation
 
@@ -442,6 +446,75 @@ T = [5 2]; nr_modelu = 3; Ks = tf(1,[5 1])*tf(1,[2 1]);
   - Provides manual control for specific testing scenarios
   - Rarely used, benefits from predictable behavior
   - Intentional design choice, not a bug
+
+**Exploration Logic** (m_losowanie_nowe.m):
+- Dual-mode: Different range sources for f=0 vs f=1
+- Mode 0 (staged learning): Range from neighboring states' best actions (adaptive)
+- Mode 1 (projection): Range from current best action ± RD (fixed)
+- Both modes enforce same-side matching: State > goal → Action > goal
+- Constraints: Force exploration (≠best), protect goal action, directional (same-side)
+- RD parameter (default 5) controls exploration width
+
+## Critical Bug Fixes (2025-01-23/24)
+
+**All experiments before 2025-01-23 must be re-run.** Five critical bugs were discovered and fixed:
+
+### Bug #1: Exploration Constraint Inverted
+**File**: m_losowanie_nowe.m
+**Problem**: Used opposite-side logic instead of same-side matching
+**Fix**: Changed to `(wyb_akcja3 > goal && state > goal) || (wyb_akcja3 < goal && state < goal)`
+**Impact**: Enabled proper exploration in states 51-100 (previously blocked)
+
+### Bug #2: Failed Exploration Q-Update
+**File**: m_regulator_Q.m
+**Problem**: When exploration failed 10 times, fell back to best action but still set `uczenie=1`
+**Fix**: Set `uczenie=0` when falling back to exploitation
+**Impact**: Broke positive feedback loop reinforcing wrong actions
+
+### Bug #3: State-Action Temporal Mismatch
+**Affects**: Both T0=0 and T0>0
+**Problem**:
+- T0>0: Action selection happened AFTER buffering → paired state(k) with action(k-1)
+- T0=0: Used current action/reward with previous state → paired state(k-1) with action(k)
+**Fix**:
+- T0>0: Moved action selection BEFORE buffering (m_regulator_Q.m:86-147)
+- T0=0: Save old_wyb_akcja, old_uczenie, old_R before selecting new (m_regulator_Q.m:87-94)
+**Impact**: Now only Q(goal_state, goal_action) has high value
+
+### Bug #4: Reward Temporal Mismatch
+**Affects**: Both T0=0 and T0>0
+**Problem**:
+- T0>0: Reward for LEAVING goal instead of ARRIVING
+- T0=0: Reward from iteration k used to update state-action from iteration k-1
+**Fix**:
+- T0>0: Reward if arrive OR (in goal with goal action) (m_regulator_Q.m:168-175)
+- T0=0: Use old_R instead of current R (m_regulator_Q.m:95, 192)
+**Impact**: Q(goal,goal) now converges toward 100
+
+### Bug #5: Bootstrap Contamination (T0>0 only)
+**Problem**: Q(goal,goal) DECREASED from 94.31 to 74.10 due to numerical drift causing next_state ≠ goal
+**Fix**: Bootstrap override for goal→goal transitions (m_regulator_Q.m:178-187, 205, 217, 224)
+```matlab
+if old_stan_T0 == nr_stanu_doc && wyb_akcja_T0 == nr_akcji_doc
+    stan_T0_for_bootstrap = nr_stanu_doc;  % Override to goal
+else
+    stan_T0_for_bootstrap = stan_T0;       % Use actual
+end
+```
+**Impact**: Goal→Goal transitions: 100% (was 74.3%), Q(goal,goal) increases
+
+### Results After Fixes
+**T0=0, 50 epochs**:
+- Q(50,50): 92.46 (converging to 100) ✓
+- TD error: Decreasing ✓
+
+**T0=4**: Expected to converge with Bug #5 fix
+
+### Debug System
+Enable in config.m: `debug_logging = 1`
+**Tools**: diagnose_q_table.m, analyze_debug_logs.m (MATLAB)
+**Fields**: DEBUG_old_state, DEBUG_old_action, DEBUG_R_buffered, DEBUG_stan_T0_for_bootstrap
+**Performance**: ~600 MB for 2000 epochs, ~10-15% CPU overhead
 
 ## Publications
 

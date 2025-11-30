@@ -1,0 +1,277 @@
+% ========================================================================
+% SECTION 3: Q2D CONTROLLER WITH PROJECTION FUNCTION
+% ========================================================================
+% Structure: 4 subsections (2.2 pages total)
+% Main methodology section with detailed algorithms
+% ========================================================================
+
+\section{Q2d Controller with Projection Function}
+\label{sec:q2d_projection}
+
+\subsection{State Space Merging}
+\label{subsec:state_merging}
+
+Traditional Q-learning formulations for control applications discretize error $e$ and error derivative $\dot{e}$ independently, creating a two-dimensional state space $(e, \dot{e})$ and a three-dimensional Q-matrix when considering actions~\cite{stebel2020}. For example, with $N$ discrete values for each dimension, the state space contains $N \times N$ states and the Q-matrix requires $N \times N \times N = N^3$ elements. This cubic growth in memory becomes prohibitive for fine discretization or resource-constrained implementations such as programmable logic controllers (PLCs).
+
+The Q2d approach overcomes this limitation by merging error and error derivative into a single state variable based on the target trajectory~\eqref{eq:target_trajectory}:
+%
+\begin{equation}
+s = \dot{e} + \frac{1}{T_e} e
+\label{eq:merged_state}
+\end{equation}
+%
+This merged state has a clear physical interpretation: $s$ measures the deviation from the desired first-order trajectory. When $s = 0$, the error evolves according to $\dot{e} = -(1/T_e)e$, meaning the system follows the target trajectory exactly. Positive values $s > 0$ indicate the error is decreasing slower than desired or increasing, while negative values $s < 0$ indicate faster-than-desired error reduction.
+
+The dimensionality reduction from $(e, \dot{e})$ to $s$ reduces the Q-matrix from $N^3$ to $N^2$ elements, providing substantial memory savings. For example, with $N = 100$, the reduction is from $10^6$ to $10^4$ elements---a 100-fold decrease. Beyond memory efficiency, our previous work demonstrated that Q2d exhibits faster learning convergence and more consistent behavior than Q3d~\cite{musial2024}.
+
+The merged state naturally accommodates both positive and negative values. We denote the discrete state space as:
+%
+\begin{equation}
+\mathcal{S} = \{s_1, s_2, \ldots, s_{N_s}\}
+\label{eq:discrete_state_space}
+\end{equation}
+%
+where $N_s$ is the total number of states, typically an odd number (e.g., $N_s = 2N-1$) to include a goal state at $s = 0$ and symmetric positive/negative states.
+
+
+\subsection{Projection Function Derivation}
+\label{subsec:projection_derivation}
+
+When the desired time constant $T_e$ differs from the baseline integral time $T_I$ (e.g., $T_e = 10$~s vs. $T_I = 20$~s), direct application of the merged state~\eqref{eq:merged_state} with the PI control structure~\eqref{eq:pi_velocity_form} creates a mismatch. The PI controller was tuned for trajectory dynamics characterized by $T_I$, but we desire dynamics characterized by $T_e$. This section derives a projection function that compensates for this mismatch.
+
+\subsubsection{Mathematical Basis}
+
+Consider the desired trajectory requirement~\eqref{eq:target_trajectory} with time constant $T_e$:
+%
+\begin{equation}
+\dot{e} + \frac{1}{T_e} e = 0
+\label{eq:trajectory_Te}
+\end{equation}
+%
+The PI controller structure~\eqref{eq:pi_velocity_form}, however, naturally implements a trajectory with time constant $T_I$:
+%
+\begin{equation}
+\dot{e} + \frac{1}{T_I} e = 0
+\label{eq:trajectory_TI}
+\end{equation}
+%
+The difference between these trajectories is:
+%
+\begin{equation}
+\left(\dot{e} + \frac{1}{T_e} e\right) - \left(\dot{e} + \frac{1}{T_I} e\right) = \left(\frac{1}{T_e} - \frac{1}{T_I}\right) e
+\label{eq:trajectory_difference}
+\end{equation}
+%
+This mismatch must be compensated in the control law to achieve the desired $T_e$ dynamics.
+
+\subsubsection{Projection Term}
+
+To compensate for the trajectory mismatch, we introduce an additional control term proportional to the error and the difference in time constants:
+%
+\begin{equation}
+\Delta u_{\text{proj}} = -e \cdot \left(\frac{1}{T_e} - \frac{1}{T_I}\right)
+\label{eq:projection_term}
+\end{equation}
+%
+The negative sign ensures the compensation acts in the correct direction. When $T_e < T_I$ (faster response desired), the term $(1/T_e - 1/T_I) > 0$, and the projection adds a negative correction for positive errors, accelerating error reduction. Conversely, when $T_e > T_I$ (slower response), the projection becomes positive for positive errors, moderating the control action.
+
+The physical interpretation is straightforward: the projection function compensates for the difference between the baseline PI trajectory ($T_I$) and the desired Q-learning trajectory ($T_e$). When $T_e = T_I$, the projection term vanishes, and standard Q2d control applies. The magnitude of compensation is proportional to both the current error (larger errors require larger correction) and the relative mismatch between time constants.
+
+\subsubsection{Complete Control Law}
+
+The complete Q2d control law with projection function becomes:
+%
+\begin{equation}
+\begin{aligned}
+u(t) &= u(t-\Delta t) + K_Q \cdot a(s) \cdot \Delta t - e(t) \cdot \left(\frac{1}{T_e} - \frac{1}{T_I}\right) \\
+&= u(t-\Delta t) + K_Q \cdot a(s) \cdot \Delta t + \Delta u_{\text{proj}}(t)
+\end{aligned}
+\label{eq:control_law_with_projection}
+\end{equation}
+%
+where:
+\begin{itemize}
+\item $u(t)$ is the control signal at time $t$
+\item $K_Q$ is the controller gain (typically set to $K_P$ for bumpless switching)
+\item $a(s)$ is the action selected for the current merged state $s$
+\item $\Delta t$ is the sampling time
+\item $e(t)$ is the control error
+\item $\Delta u_{\text{proj}}(t)$ is the projection compensation~\eqref{eq:projection_term}
+\end{itemize}
+
+The control signal is saturated to respect actuator constraints:
+%
+\begin{equation}
+u(t) = \text{sat}_{[u_{\min}, u_{\max}]}(u(t))
+\label{eq:saturation}
+\end{equation}
+%
+where typical values are $u_{\min} = 0\%$ and $u_{\max} = 100\%$ for industrial applications.
+
+
+\subsection{State and Action Generation}
+\label{subsec:state_action_generation}
+
+The discretization of the continuous merged state space~\eqref{eq:merged_state} into a finite set of states~\eqref{eq:discrete_state_space} critically influences controller performance. We employ an exponentially-distributed discretization that provides dense sampling near the goal state ($s = 0$) where precise control is required, and coarser sampling for larger deviations where aggressive corrective action suffices.
+
+\subsubsection{Generation Procedure}
+
+The state and action generation follows Algorithm~\ref{alg:state_action_generation}:
+
+\begin{algorithm}[htb]
+\caption{State and Action Space Generation}
+\label{alg:state_action_generation}
+\begin{algorithmic}[1]
+\REQUIRE $T_e$, $\tau$, $e_{\max}$, $\varepsilon_{\text{prec}}$, $N_{\text{expected}}$
+\ENSURE State boundaries $\mathcal{S}_b$, state means $\mathcal{S}_m$, actions $\mathcal{A}$
+\STATE $i \gets 0$, $t \gets 0$
+\WHILE{$e(t) > \varepsilon_{\text{prec}}$ \AND $i < N_{\text{max}}$}
+    \STATE $e(i) \gets e_{\max} \cdot \exp(-t/\tau)$ \COMMENT{Exponential decay}
+    \STATE $\dot{e}(i) \gets (e(i+1) - e(i)) / \Delta t$ \COMMENT{Numerical derivative}
+    \STATE $t \gets t + \Delta t$
+    \STATE $i \gets i + 1$
+\ENDWHILE
+\STATE $N_{\text{points}} \gets i$
+\STATE
+\FOR{$i = 1$ to $N_{\text{points}}$}
+    \FOR{$j = 1$ to $N_{\text{points}}$}
+        \STATE $s_{k} \gets \dot{e}(j) + (1/T_e) \cdot e(i)$ \COMMENT{Compute state values}
+        \STATE $k \gets k + 1$
+    \ENDFOR
+\ENDFOR
+\STATE
+\STATE Sort all $s_k$ values in ascending order
+\STATE Merge adjacent values if $|s_{k+1} - s_k| < \varepsilon_{\text{merge}}$
+\STATE Resulting positive states: $\{s_1^+, s_2^+, \ldots, s_N^+\}$
+\STATE
+\STATE Extend symmetrically: $\mathcal{S}_b \gets \{-s_N^+, \ldots, -s_1^+, 0, s_1^+, \ldots, s_N^+\}$
+\STATE
+\FOR{each adjacent pair $(s_i, s_{i+1})$ in $\mathcal{S}_b$}
+    \STATE $s_{\text{mean},i} \gets (s_i + s_{i+1})/2$ \COMMENT{State representative value}
+\ENDFOR
+\STATE
+\STATE $\mathcal{A} \gets \mathcal{S}_m$ \COMMENT{Actions equal state means}
+\RETURN $\mathcal{S}_b$, $\mathcal{S}_m$, $\mathcal{A}$
+\end{algorithmic}
+\end{algorithm}
+
+\noindent\textbf{Parameters:}
+\begin{itemize}
+\item $\tau$: Exponential decay time constant for trajectory generation (independent of $T_e$)
+\item $e_{\max}$: Maximum expected error (determines range coverage)
+\item $\varepsilon_{\text{prec}}$: Precision parameter defining steady-state accuracy
+\item $N_{\text{expected}}$: Expected number of states (guides $\tau$ selection)
+\item $\varepsilon_{\text{merge}}$: Merging threshold for close boundaries
+\end{itemize}
+
+The parameter $\tau$ provides flexibility independent of the control time constant $T_e$. Smaller $\tau$ values create more densely distributed states near zero, improving steady-state accuracy at the cost of larger Q-matrices. The precision parameter $\varepsilon_{\text{prec}}$ directly determines the steady-state error tolerance---typical values range from $0.1$ to $1.0$ for percentage-based error representation.
+
+\subsubsection{Scaling with Time Constant}
+
+A critical property of the merged state~\eqref{eq:merged_state} is that the steady-state error tolerance remains invariant to $T_e$ changes. In steady state, $\dot{e} = 0$, so:
+%
+\begin{equation}
+s_{\text{ss}} = \frac{1}{T_e} e_{\text{ss}}
+\label{eq:steady_state_relation}
+\end{equation}
+%
+If the goal state spans $s \in (-s_{\text{goal}}, s_{\text{goal}}]$, the corresponding steady-state error tolerance is:
+%
+\begin{equation}
+-T_e \cdot s_{\text{goal}} < e_{\text{ss}} \leq T_e \cdot s_{\text{goal}}
+\label{eq:error_tolerance}
+\end{equation}
+%
+By setting $s_{\text{goal}} = \varepsilon_{\text{prec}}/T_e$, the error tolerance becomes:
+%
+\begin{equation}
+-\varepsilon_{\text{prec}} < e_{\text{ss}} \leq \varepsilon_{\text{prec}}
+\label{eq:te_invariant_tolerance}
+\end{equation}
+%
+which is independent of $T_e$. This ensures consistent steady-state accuracy regardless of the chosen time constant.
+
+\subsubsection{Q-Matrix Initialization}
+
+The Q-matrix is initialized as an identity matrix:
+%
+\begin{equation}
+Q_{ij}(0) = \begin{cases}
+1 & \text{if } i = j \\
+0 & \text{otherwise}
+\end{cases}
+\label{eq:q_matrix_initialization}
+\end{equation}
+%
+where $i$ indexes states and $j$ indexes actions. This initialization ensures that each state initially selects the action corresponding to its own mean value, mimicking the PI control structure. The diagonal initialization provides stable starting behavior while allowing the learning process to discover improved policies.
+
+
+\subsection{Control Algorithm Implementation}
+\label{subsec:control_algorithm}
+
+The complete Q2d control algorithm with projection function is presented in Algorithm~\ref{alg:q2d_control}.
+
+\begin{algorithm}[htb]
+\caption{Q2d Control with Projection Function}
+\label{alg:q2d_control}
+\begin{algorithmic}[1]
+\REQUIRE Q-matrix $Q$, states $\mathcal{S}_b$, actions $\mathcal{A}$, process model, parameters
+\ENSURE Learned Q-matrix $Q$, performance logs
+\STATE Initialize: $u \gets y_{\text{sp}}/k$, $e_{\text{prev}} \gets 0$
+\STATE
+\FOR{iteration $t = 1$ to $N_{\text{iterations}}$}
+    \STATE \COMMENT{--- State Calculation ---}
+    \STATE $e \gets y_{\text{sp}} - y$ \COMMENT{Control error}
+    \STATE $\dot{e} \gets (e - e_{\text{prev}})/\Delta t$ \COMMENT{Error derivative}
+    \STATE $s \gets \dot{e} + (1/T_e) \cdot e$ \COMMENT{Merged state}
+    \STATE $i_s \gets \text{FindState}(s, \mathcal{S}_b)$ \COMMENT{Discretize to index}
+    \STATE
+    \STATE \COMMENT{--- Action Selection ---}
+    \IF{$i_s = i_{\text{goal}}$}
+        \STATE $i_a \gets i_{\text{goal\_action}}$ \COMMENT{Force zero action at goal}
+        \STATE $\varepsilon_{\text{learning}} \gets 0$ \COMMENT{No learning at goal}
+    \ELSE
+        \STATE Draw $\xi \sim \mathcal{U}(0,1)$
+        \IF{$\xi < \varepsilon$}
+            \STATE $i_a \gets \text{ExploreAction}(i_s, \mathcal{A})$ \COMMENT{$\varepsilon$-greedy exploration}
+            \STATE $\varepsilon_{\text{learning}} \gets 1$
+        \ELSE
+            \STATE $i_a \gets \arg\max_j Q(i_s, j)$ \COMMENT{Exploit best action}
+            \STATE $\varepsilon_{\text{learning}} \gets 1$
+        \ENDIF
+    \ENDIF
+    \STATE
+    \STATE \COMMENT{--- Control Computation ---}
+    \STATE $a \gets \mathcal{A}(i_a)$ \COMMENT{Retrieve action value}
+    \STATE $\Delta u_Q \gets K_Q \cdot a \cdot \Delta t$ \COMMENT{Q-learning increment}
+    \STATE $\Delta u_{\text{proj}} \gets -e \cdot (1/T_e - 1/T_I)$ \COMMENT{Projection compensation}
+    \STATE $u \gets u + \Delta u_Q + \Delta u_{\text{proj}}$ \COMMENT{Total control}
+    \STATE $u \gets \text{sat}_{[0, 100]}(u)$ \COMMENT{Saturation}
+    \STATE
+    \IF{$u$ saturated}
+        \STATE $\varepsilon_{\text{learning}} \gets 0$ \COMMENT{Disable learning when saturated}
+    \ENDIF
+    \STATE
+    \STATE \COMMENT{--- Plant Simulation ---}
+    \STATE $y \gets \text{SimulatePlant}(u, T_0)$ \COMMENT{Apply control with dead time}
+    \STATE
+    \STATE \COMMENT{--- Q-Learning Update (handled in Section IV) ---}
+    \STATE Store $(i_s, i_a, \varepsilon_{\text{learning}})$ for credit assignment
+    \STATE
+    \STATE \COMMENT{--- State Update ---}
+    \STATE $e_{\text{prev}} \gets e$
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Key Implementation Details}
+
+\noindent\textbf{Manual Control Phase:} The first few sampling intervals (typically 5) use manual control $u = y_{\text{sp}}/k$ to initialize the system toward steady state and pre-fill delay buffers, where $k$ is the process steady-state gain.
+
+\noindent\textbf{Goal State Enforcement:} When the system reaches the goal state ($s \approx 0$), the controller always selects the goal action ($a = 0$, representing zero control increment) to maintain steady state. Learning is disabled in the goal state since the optimal action is already known.
+
+\noindent\textbf{Saturation Handling:} When the control signal saturates, Q-learning updates are disabled ($\varepsilon_{\text{learning}} = 0$) to prevent learning from unrealizable actions. This anti-windup mechanism prevents the Q-matrix from associating rewards with saturated control values.
+
+\noindent\textbf{Exploration Strategy:} The exploration function $\text{ExploreAction}(i_s, \mathcal{A})$ selects random actions within a constrained range around the current best action, bounded by a parameter $RD$ (random deviation). Additionally, directional constraints ensure that states above the goal select actions above the goal action, and vice versa, maintaining consistent trajectory-following behavior.
+
+The Q-learning update mechanism, including dead time compensation, is detailed in Section~\ref{sec:deadtime_compensation}.

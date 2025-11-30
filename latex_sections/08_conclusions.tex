@@ -1,0 +1,52 @@
+% ========================================================================
+% SECTION 7: CONCLUSIONS
+% ========================================================================
+% Structure: 2 subsections (0.7 pages total)
+% Summarizes contributions and outlines future work
+% ========================================================================
+
+\section{Conclusions}
+\label{sec:conclusions}
+
+\subsection{Summary of Contributions}
+\label{subsec:summary}
+
+This paper presented a model-free Q-learning controller with two key extensions that address critical challenges for industrial deployment: time constant mismatch compensation and dead time handling. The proposed Q2d approach combines projection-based trajectory compensation with delayed credit assignment to enable effective learning in processes exhibiting significant transport delays.
+
+The principal contributions are:
+
+\noindent\textbf{1. Projection Function for Time Constant Mismatch:} A mathematically derived compensation term $\Delta u_{\text{proj}} = -e \cdot (1/T_e - 1/T_I)$ enables direct operation with desired time constant $T_e$ differing from the baseline integral time $T_I$. Validation on first- and second-order inertia processes demonstrates 12--22\% IAE improvement over PI baseline when using moderate time constant ratios ($T_e/T_I = 0.5$). The projection function maintains stable learning while providing meaningful performance gains for industrial applications requiring faster response than existing PI tunings.
+
+\noindent\textbf{2. Delayed Credit Assignment for Dead Time:} A buffer-based mechanism decouples the physical plant dead time $T_0$ from the controller's compensation strategy $T_{0,\text{controller}}$, enabling systematic investigation of matched compensation, undercompensation, and no compensation scenarios. FIFO buffers defer Q-value updates by $T_{0,\text{controller}}/\Delta t$ samples, ensuring correct temporal alignment between actions and their observable consequences. This model-free approach provides an alternative to traditional model-based dead time compensation techniques such as Smith Predictor and Internal Model Control.
+
+\noindent\textbf{3. Robustness to Partial Dead Time Knowledge:} Experimental validation demonstrates graceful degradation when dead time is underestimated. For $T_0 = 4$~s, 50\% undercompensation ($T_{0,c} = 2$~s) achieves 9.7\% IAE improvement compared to 11.4\% for matched compensation and only 4.3\% for no compensation. This 85\% effectiveness with a 50\% estimation error provides significant robustness for industrial environments where exact dead time values are uncertain or time-varying.
+
+\noindent\textbf{4. Bumpless Switching and Online Learning:} The controller initializes from existing PI tunings ($K_Q = K_P$, $T_e = T_I$ equivalent initially via projection function), ensuring no performance degradation at deployment. Validation confirms Q-initial performance within 3--6\% of PI baseline across all tested scenarios. Online learning through disturbance-based episodes gradually improves performance without requiring offline training or process models.
+
+The method was validated on two plant models (first- and second-order inertia) with dead times up to $T_0 = 4$~s (40 sampling intervals) across 14 experimental scenarios. Quantitative metrics (IAE, overshoot, settling time) demonstrate consistent improvement over PI baseline, with dead time compensation providing 2--3$\times$ better performance than operation without compensation.
+
+The primary limitation identified is the projection function's effectiveness range: moderate time constant ratios ($T_e/T_I \approx 0.3$--$0.7$) work well, but extreme ratios ($< 0.2$) exhibit convergence challenges due to projection magnitude dominance over Q-learning contributions. For applications requiring large time constant changes, alternative approaches warrant investigation.
+
+
+\subsection{Future Work}
+\label{subsec:future_work}
+
+Several promising research directions emerge from this work:
+
+\noindent\textbf{Improved Time Constant Mismatch Handling:} Staged learning approaches that gradually reduce $T_e$ from $T_I$ to a goal value $T_{e,\text{goal}}$ in small increments (e.g., 0.1~s steps) avoid large projection magnitudes while enabling arbitrarily large time constant changes. Preliminary results suggest this approach overcomes the projection function limitations identified here, making it suitable for applications requiring 5$\times$--10$\times$ speed-ups. A companion paper detailing staged learning with convergence criteria based on least-squares filtering is in preparation~\cite{musial2025}.
+
+\noindent\textbf{Higher-Order Process Extension:} Validation was limited to first- and second-order dynamics. Extension to third-order systems, complex pneumatic actuators, and oscillatory processes (e.g., underdamped second-order dynamics) would broaden applicability. Higher-order systems may require larger Q-matrices and modified state/action generation strategies to maintain learning efficiency.
+
+\noindent\textbf{Adaptive Dead Time Estimation:} The demonstrated robustness to undercompensation suggests that online adaptation of $T_{0,c}$ during learning is feasible. Starting with $T_{0,c} = 0$ and incrementally increasing based on Q-value convergence metrics could automatically tune dead time compensation without requiring prior measurement. Challenges include distinguishing between insufficient compensation and inherent learning variability.
+
+\noindent\textbf{Extended Dead Time Range:} Testing was limited to $T_0 \leq 4$~s. Industrial processes such as long-pipe transport, blending tanks, or distributed thermal systems may exhibit dead times of 10--60~s or more. Investigating buffer memory requirements, convergence rates, and performance limits for $T_0 \gg T_I$ would clarify the method's applicability boundaries.
+
+\noindent\textbf{PLC Implementation and Industrial Validation:} The 2D Q-matrix structure ($100 \times 100 = 10,000$ elements) is compatible with modern PLC memory constraints. Implementing the algorithm as a function block library in IEC 61131-3 structured text and validating on real industrial hardware (chemical reactors, heat exchangers, or motor drives) would demonstrate practical feasibility beyond simulation studies. Finite-precision arithmetic effects (e.g., 32-bit floating point) and real-time execution constraints merit investigation.
+
+\noindent\textbf{Multi-Input Multi-Output Extension:} While this work focused on SISO control, many industrial applications involve coupled MIMO systems. Extending Q2d to handle multiple manipulated variables and controlled outputs while maintaining reasonable Q-matrix sizes presents both theoretical and practical challenges. Decentralized Q-learning with partial observability or hierarchical decomposition strategies may prove necessary.
+
+\noindent\textbf{Integration with Alarm and Safety Systems:} Industrial deployment requires integration with existing safety interlocks, process alarms, and operational limits. Developing standards for disabling learning during abnormal operation, reverting to fallback PI control during emergencies, and automatically adjusting exploration rates based on process criticality would enhance industrial acceptance.
+
+\noindent\textbf{Comparative Study with Model-Based Adaptive Control:} Benchmarking Q2d against adaptive PID tuning (e.g., self-tuning regulators~\cite{astrom1995}), gain-scheduled control, and model predictive control (MPC) would clarify the trade-offs between model-free learning and model-based adaptation. Hybrid approaches combining initial model-based compensation with gradual reinforcement learning refinement may offer synergistic benefits.
+
+The demonstrated ability to bumplessly replace existing PI controllers with a learning-based alternative that requires no process model, handles dead time robustly, and exhibits graceful degradation under parameter uncertainty represents a step toward practical industrial deployment of reinforcement learning in continuous process control. Further development along the directions outlined above will strengthen the foundation for large-scale adoption in industrial automation.

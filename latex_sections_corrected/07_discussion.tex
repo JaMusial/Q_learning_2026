@@ -1,0 +1,111 @@
+% ========================================================================
+% SECTION 7: DISCUSSION (CORRECTED VERSION)
+% ========================================================================
+% CRITICAL REQUIREMENTS:
+% - First person ("we demonstrate", "our approach")
+% - Uppercase symbols Y(t), U(t), lowercase e(t) for error, Ysp
+% - NO numerical claims without experimental proof
+% - Projection function: enables initialization (its purpose)
+% - Qualitative discussion only (no made-up metrics)
+% - Tuning guidelines without specific numbers
+% - Updated: Error symbol changed from E to e throughout
+% ========================================================================
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Projection Function: Enabling Bumpless Initialization}
+\label{subsec:discussion_projection}
+
+The projection function serves a specific purpose in our Q2d controller architecture: it enables bumpless switching from an existing PI controller to the Q-learning controller even when the desired trajectory time constant $T_e$ differs from the baseline integral time $T_I$. This capability is critical for industrial deployment scenarios where an existing PI controller with tuning $K_{PI}$ and $T_I$ is already operational.
+
+Without the projection function, bumpless initialization would require $T_e = T_I$, which restricts the controller's initial operating point. While this constraint can be satisfied, it limits the designer's flexibility in choosing the target trajectory time constant based on performance requirements or process characteristics.
+
+The projection term $\Delta U_{\text{proj}} = -e \cdot (1/T_e - 1/T_I)$ compensates for the structural difference between the Q2d controller's trajectory dynamics (based on $T_e$ via the merged state definition) and the PI controller's implicit trajectory dynamics (based on $T_I$ via the integral term). When $T_e = T_I$, the projection term vanishes, and the controller operates without this compensation. When $T_e \neq T_I$, the projection ensures that the initial control law matches the PI baseline behavior despite the time constant mismatch.
+
+This design choice reflects a practical engineering consideration: industrial controllers must integrate seamlessly into existing control systems without causing transients or requiring plant shutdowns for commissioning. The projection function addresses this requirement by decoupling the choice of trajectory time constant from the need for bumpless initialization.
+
+
+\subsection{Dead Time Compensation Through Delayed Credit Assignment}
+\label{subsec:discussion_deadtime}
+
+The delayed credit assignment mechanism addresses a fundamental challenge in applying Q-learning to processes with dead time: ensuring that Q-value updates credit the correct state-action pairs. Our buffer-based approach provides an explicit solution to the temporal credit assignment problem by deferring Q-value updates until action consequences become observable in the measured process output.
+
+The effectiveness of this approach depends critically on the accuracy of the dead time estimate used by the controller. When $T_{0,\text{controller}} = T_0$ (matched compensation), the buffers synchronize perfectly with the physical delay, ensuring that each action $a(t)$ is updated based on the state $s(t+T_0)$ that actually reflects its consequence. This temporal alignment is essential for correct Q-value propagation and policy learning.
+
+The decoupled parameterization ($T_0$ for the physical plant, $T_{0,\text{controller}}$ for the controller compensation) enables systematic investigation of robustness to dead time estimation errors. Industrial processes often exhibit time-varying delays due to changing operating conditions, flow rates, or measurement configurations. The ability to maintain reasonable performance even when $T_{0,\text{controller}} \neq T_0$ would be valuable for practical deployment.
+
+An important observation from our algorithm design is that even with no explicit compensation ($T_{0,\text{controller}} = 0$), Q-learning should eventually learn a policy that accounts for the delay implicitly through the state-action value function. However, we expect this implicit learning to require significantly more training episodes and potentially converge to suboptimal policies compared to explicit compensation. The experimental results will quantify this trade-off.
+
+The sparse reward strategy ($R=1$ only at the goal state with goal action) interacts with dead time compensation in a subtle way. Because reward is assigned based on arrival at the goal state, the buffering mechanism ensures that actions leading to goal state arrival receive positive reward, while actions leading away from the goal receive zero reward. This creates a value gradient in the Q-matrix that propagates backward through the state space via the bootstrap term $\gamma \max_{a'} Q(s',a')$. The dead time compensation ensures this propagation follows the correct temporal causality.
+
+
+\subsection{State Space Design and Discretization}
+\label{subsec:discussion_discretization}
+
+The geometric action distribution employed in Q2d provides several practical advantages over alternative discretization schemes. By generating actions first using the geometric progression starting from $a_1 = 2 \cdot \text{prec}/T_e$ and then placing states at action midpoints, we achieve a natural density gradient: fine resolution near the goal state (where precise control is needed) and coarse resolution far from the goal (where aggressive correction is appropriate).
+
+This density gradient emerges automatically from the geometric ratio calculation and does not require manual tuning of placement parameters. The single user-specified parameter---expected number of states---determines the geometric ratio $q$ through the constraint that the largest action must reach the scaled control limit. The resulting distribution adapts to different process characteristics and control constraints without requiring problem-specific adjustments.
+
+An important property of our discretization is the $T_e$-invariant error tolerance. Because the smallest state value is $s_1 = \text{prec}/T_e$ and the goal state spans $s \in (-s_1, s_1]$, the steady-state error tolerance remains $\pm\text{prec}$ regardless of the trajectory time constant. This invariance would be particularly valuable in scenarios where $T_e$ changes during operation (such as staged learning approaches), though in the present work $T_e$ remains constant throughout training and verification.
+
+The Q-matrix initialization as an identity matrix ensures that each state initially selects its corresponding diagonal action. Combined with the symmetric placement of states and actions around zero, this initialization provides stable baseline behavior before learning begins. The structure does not encode any problem-specific knowledge beyond the basic principle that states and actions should be similarly scaled.
+
+
+\subsection{Exploration Strategy and Learning Efficiency}
+\label{subsec:discussion_exploration}
+
+The $\varepsilon$-greedy exploration strategy with constrained action selection balances the need for exploration (discovering potentially better policies) against the risk of destabilizing exploratory actions (causing large errors or control saturation). Our implementation enforces same-side matching: states above the goal state can only explore actions above the goal action, and vice versa. This directional constraint reduces the exploration space but prevents obviously counterproductive actions such as applying positive control increments when the error is already positive and growing.
+
+The exploration rate $\varepsilon = 0.3$ during training represents a relatively high exploration level compared to typical Q-learning applications. This choice reflects the continuous nature of the control problem and the need to visit a wide range of state-action pairs to learn a robust policy. Industrial processes exhibit stochastic disturbances and varying operating conditions, so the learned policy must generalize beyond the specific conditions encountered during training.
+
+A critical distinction in our methodology is the separation of training mode (with exploration) and verification mode (pure exploitation, $\varepsilon = 0$). During verification experiments, we disable exploration entirely to evaluate the learned policy without the influence of random exploratory actions. This separation ensures that performance metrics (IAE, overshoot, settling time) reflect the actual learned behavior rather than a mixture of learned policy and random exploration.
+
+The episode termination criteria---stabilization (reaching and maintaining the goal state) or timeout (maximum iteration count)---provide natural boundaries for convergence monitoring. Episodes that terminate by stabilization indicate successful disturbance rejection, while timeouts during early training reflect incomplete learning. The continuous learning mode (buffers not reset between episodes) simulates realistic industrial operation where disturbances occur at arbitrary times without system resets.
+
+
+\subsection{Practical Tuning Guidelines}
+\label{subsec:discussion_tuning}
+
+Deploying the Q2d controller in an industrial setting requires selecting several design parameters. We offer the following qualitative guidelines based on the theoretical properties of the algorithm and our implementation experience:
+
+\noindent\textbf{Trajectory Time Constant ($T_e$):} Should be chosen based on desired closed-loop response speed. Faster response (smaller $T_e$) requires more aggressive control action and may be limited by actuator constraints or process dynamics. A reasonable starting point is to match the existing PI integral time ($T_e = T_I$) for bumpless initialization, though the projection function enables other choices.
+
+\noindent\textbf{Controller Gain ($K_Q$):} Should match the existing PI proportional gain ($K_Q = K_{PI}$) for bumpless initialization. This ensures that the initial control effort magnitude is consistent with the baseline controller.
+
+\noindent\textbf{Precision Parameter (prec):} Determines the steady-state error tolerance. Smaller values provide tighter regulation but require finer discretization and potentially longer learning times. Typical values of 0.5--1.0\% of the setpoint range balance accuracy and computational efficiency.
+
+\noindent\textbf{Expected Number of States:} Controls the discretization granularity. Larger values (e.g., 100--200) provide finer resolution but increase Q-matrix size and memory requirements. For PLC implementations, this represents a trade-off between control precision and available memory.
+
+\noindent\textbf{Learning Rate ($\alpha$):} Controls the speed of Q-value updates. Values of 0.1--0.2 provide reasonable convergence rates without excessive sensitivity to individual transitions. Too large values can cause oscillations in Q-values; too small values slow convergence.
+
+\noindent\textbf{Discount Factor ($\gamma$):} Should be close to but less than 1 (typical values 0.95--0.99). Larger values emphasize long-term rewards and create stronger value gradients across the state space, but values too close to 1 can cause numerical issues.
+
+\noindent\textbf{Exploration Rate ($\varepsilon$):} Should balance exploration and exploitation during training. Values of 0.2--0.4 enable sufficient exploration without excessive random actions. Should be set to 0 during verification and deployment for pure exploitation of the learned policy.
+
+\noindent\textbf{Training Duration:} Depends on process dynamics, dead time magnitude, and desired convergence level. Monitoring the Q-value at the goal state ($Q(s_{\text{goal}}, a_{\text{goal}})$) provides a convergence indicator---values approaching $1/(1-\gamma)$ suggest near-optimal learning.
+
+These guidelines provide starting points for parameter selection. The specific optimal values depend on process characteristics, control objectives, and practical constraints. Simulation studies with process models (when available) can help refine parameter choices before deployment.
+
+
+\subsection{Limitations and Assumptions}
+\label{subsec:discussion_limitations}
+
+Our approach makes several assumptions that should be considered when evaluating applicability to specific industrial scenarios:
+
+\noindent\textbf{Single-Input Single-Output (SISO) Processes:} The Q2d formulation addresses single-loop control problems. Extension to multivariable processes would require different state space formulations or coordinated single-loop controllers.
+
+\noindent\textbf{Constant Process Dynamics:} We assume process dynamics remain sufficiently constant during learning. Processes with significant time-varying behavior or multiple operating regimes may require adaptive mechanisms or regime-specific Q-matrices.
+
+\noindent\textbf{Known Dead Time:} The delayed credit assignment mechanism requires knowledge of the dead time magnitude. Processes with unknown or highly variable dead time may need dead time estimation methods or robust compensation strategies.
+
+\noindent\textbf{Linear Control Saturation:} We assume hard limits on control signals $[U_{\min}, U_{\max}]$. More complex actuator dynamics (rate limits, hysteresis, deadband) would require additional modeling in the control algorithm.
+
+\noindent\textbf{Measurement Availability:} We require sampled measurements of the process output at regular intervals. Processes with irregular sampling, missing data, or measurement delays may need modified update rules.
+
+\noindent\textbf{Disturbance-Based Learning:} Our training protocol uses load disturbances to generate learning episodes. Processes where disturbances are rare or unacceptable during training may require alternative excitation strategies.
+
+\noindent\textbf{First-Order Trajectory Target:} The merged state definition assumes a first-order exponential trajectory is appropriate. Processes requiring overshoot prevention or specific settling characteristics may benefit from different trajectory formulations.
+
+Despite these limitations, many industrial regulatory control loops satisfy these assumptions. Processes such as flow control, level control, pressure control, and temperature control (with appropriate dead time compensation) often exhibit behavior compatible with our approach.
+

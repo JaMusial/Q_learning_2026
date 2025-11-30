@@ -13,7 +13,11 @@
       "Bash(cat:*)",
       "Bash(mkdir:*)",
       "Bash(git fsck:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(ssh-keyscan:*)",
+      "Bash(~/.ssh/known_hosts)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,0 +1,276 @@
+% ========================================================================
+% SECTION 5: VALIDATION AND RESULTS (CORRECTED VERSION)
+% ========================================================================
+% CRITICAL CHANGES:
+% - First person
+% - Uppercase symbols Y(t), U(t), lowercase e(t) for error
+% - NO PLACEHOLDER DATA - all removed
+% - Clear statement: results to be inserted after experiments
+% - Verification uses exploitation only (ε=0)
+% - Describes experimental design without fake numbers
+% - Updated: Error symbol changed from E to e throughout
+% ========================================================================
+
+\section{Validation and Results}
+\label{sec:validation}
+
+\subsection{Experimental Setup}
+\label{subsec:experimental_setup}
+
+We validate the proposed Q2d controller with projection function and dead time compensation through simulation studies on two benchmark process models representing common industrial dynamics. All experiments are conducted in MATLAB/Simulink environment with sampling time $T_s = 0.1$~s.
+
+\subsubsection{Plant Models}
+
+\noindent\textbf{Model 1 (First-Order Inertia):}
+\begin{equation}
+G_1(s) = \frac{k}{Ts + 1} = \frac{1}{5s + 1}
+\label{eq:model1}
+\end{equation}
+This represents simple thermal processes, flow control, or level control systems where dominant dynamics are characterized by a single time constant.
+
+\noindent\textbf{Model 3 (Second-Order Inertia):}
+\begin{equation}
+G_3(s) = \frac{k}{(T_1 s + 1)(T_2 s + 1)} = \frac{1}{(5s + 1)(2s + 1)}
+\label{eq:model3}
+\end{equation}
+This represents cascaded thermal processes, heat exchangers, or systems with multiple energy storage elements. The different time constants ($T_1 = 5$~s, $T_2 = 2$~s) create more complex dynamics than Model~1.
+
+Both models use unity steady-state gain ($k = 1$) for simplicity. Dead time is added externally as $e^{-T_0 s}$.
+
+\subsubsection{Dead Time Scenarios}
+
+We investigate three dead time values:
+\begin{itemize}
+\item $T_0 = 0$~s: Baseline case without dead time
+\item $T_0 = 2$~s: Moderate dead time (20 sampling intervals)
+\item $T_0 = 4$~s: Significant dead time (40 sampling intervals)
+\end{itemize}
+
+For each $T_0 > 0$, we test three compensation strategies:
+\begin{itemize}
+\item \textbf{No compensation}: $T_{0,\text{controller}} = 0$ (naive Q-learning)
+\item \textbf{Undercompensation}: $T_{0,\text{controller}} = T_0/2$ (50\% estimate)
+\item \textbf{Matched compensation}: $T_{0,\text{controller}} = T_0$ (perfect knowledge)
+\end{itemize}
+
+This yields 7 experimental scenarios per model: 1 baseline ($T_0=0$) + 3 scenarios each for $T_0 \in \{2, 4\}$~s, totaling 14 experiments.
+
+\subsubsection{Controller Parameters}
+
+\noindent\textbf{PI Baseline:} We use standard Siemens PLC default tunings~\cite{siemens2019}:
+\begin{itemize}
+\item Proportional gain: $K_{PI} = 1$
+\item Integral time: $T_I = 20$~s
+\item Derivative time: $T_D = 0$ (PI control)
+\end{itemize}
+
+\noindent\textbf{Q2d Parameters:} Table~\ref{tab:q2d_parameters} summarizes the Q-learning configuration.
+
+\begin{table}[htb]
+\centering
+\caption{Q2d Controller Parameters}
+\label{tab:q2d_parameters}
+\begin{tabular}{lll}
+\hline
+\textbf{Parameter} & \textbf{Symbol} & \textbf{Value} \\
+\hline
+Controller gain & $K_Q$ & 1 (= $K_{PI}$) \\
+Goal time constant & $T_e$ & 10~s \\
+Baseline integral time & $T_I$ & 20~s \\
+Projection function & -- & Enabled \\
+Learning rate & $\alpha$ & 0.1 \\
+Discount factor & $\gamma$ & 0.99 \\
+Exploration rate (training) & $\varepsilon$ & 0.3 \\
+Exploration rate (verification) & $\varepsilon$ & 0 \\
+Random deviation & $RD$ & 3 \\
+Precision & prec & 0.5\% \\
+Expected states & -- & 100 \\
+Training epochs & -- & 2500 \\
+Sampling time & $T_s$ & 0.1~s \\
+Control limits & $[U_{\min}, U_{\max}]$ & [0, 100]\% \\
+\hline
+\end{tabular}
+\end{table}
+
+The choice $T_e = 10$~s represents a moderate 2$\times$ speed-up compared to the baseline $T_I = 20$~s. This ratio provides sufficient performance improvement potential while maintaining manageable projection function magnitudes.
+
+\subsubsection{Learning Protocol}
+
+\noindent\textbf{Training Mode:} Disturbance-based learning
+\begin{itemize}
+\item Exploration enabled: $\varepsilon = 0.3$
+\item Load disturbances randomly drawn from normal distribution with $\sigma_d = 0.5/3$ (3-sigma rule)
+\item Episode length randomized: $N_{\text{episode}} \sim \mathcal{N}(3000, 300^2)$, clipped to minimum 10 samples
+\item Episode terminates on stabilization (20 consecutive samples in goal state) or maximum 4000 samples
+\item Setpoint fixed at $Y_{sp} = 50\%$ during training
+\item Total training duration: 2500 epochs
+\end{itemize}
+
+\noindent\textbf{Verification Mode:} Clean experimental tests
+\begin{itemize}
+\item \textbf{Exploration disabled}: $\varepsilon = 0$ (pure exploitation of learned policy)
+\item Three phases: setpoint tracking, load disturbance rejection, setpoint tracking
+\item Setpoint steps: $50\% \to 70\% \to 50\%$ (20\% magnitude)
+\item Load disturbance: $d = \pm 0.3$ applied at specified times
+\item Total duration: 600~s
+\item Buffers reset to initial conditions before each verification run
+\item Conducted three times: with PI controller, with Q-controller before learning, with Q-controller after learning
+\end{itemize}
+
+The critical distinction is that verification experiments use pure exploitation ($\varepsilon = 0$) to evaluate the learned policy without random exploratory actions affecting the measurements.
+
+\noindent\textbf{Performance Metrics:}
+
+We compute the following metrics from verification experiments:
+\begin{itemize}
+\item \textbf{Integral Absolute Error (IAE)}: $\int_0^T |e(t)| \, dt$
+\item \textbf{Maximum Overshoot}: $\max_t |Y(t) - Y_{sp}|$ after setpoint step
+\item \textbf{Settling Time}: Time to reach $\pm 2\%$ of final value
+\item \textbf{Maximum Control Increment}: $\max_t |\Delta U(t)|$ (aggressiveness measure)
+\end{itemize}
+
+
+\subsection{Experimental Results}
+\label{subsec:experimental_results}
+
+\textit{[Note: This section will be populated with actual experimental data after running the 14 validation scenarios described above. Tables and figures will present quantitative comparisons between PI baseline, Q-controller before learning, and Q-controller after 2500 epochs of training.]}
+
+\subsubsection{Q-Learning Convergence Analysis}
+
+We will track the evolution of $Q(s_{\text{goal}}, a_{\text{goal}})$ over the 2500 training epochs for all scenarios. The Q-value at the goal state serves as a convergence indicator---values approaching the theoretical limit of $1/(1-\gamma) = 100$ indicate successful learning.
+
+\textbf{Planned Analysis:}
+\begin{itemize}
+\item Convergence rate comparison across compensation strategies
+\item Effect of dead time magnitude on learning speed
+\item Identification of plateau points indicating convergence
+\end{itemize}
+
+\textbf{Figure 1 (to be generated):} Q-learning convergence curves showing $Q(s_{\text{goal}}, a_{\text{goal}})$ vs. epoch number for Model~3 with $T_0 = 4$~s under three compensation strategies (no compensation, 50\% undercompensation, matched compensation).
+
+\subsubsection{Dead Time Compensation Effectiveness}
+
+We will quantify how compensation strategy affects final learning performance.
+
+\textbf{Table 1 (to be populated):} Q-value convergence by compensation strategy for Model~3
+\begin{table}[htb]
+\centering
+\caption{Q(goal, goal) Convergence by Compensation Strategy (Model~3) - \textit{Results Pending}}
+\label{tab:q_convergence}
+\begin{tabular}{ccccc}
+\hline
+\textbf{$T_0$ [s]} & \textbf{$T_{0,c}$ [s]} & \textbf{Strategy} & \textbf{$Q$ @ 500 ep.} & \textbf{$Q$ @ 2500 ep.} \\
+\hline
+0 & 0 & Baseline & -- & -- \\
+2 & 0 & None & -- & -- \\
+2 & 1 & Under (50\%) & -- & -- \\
+2 & 2 & Matched & -- & -- \\
+4 & 0 & None & -- & -- \\
+4 & 2 & Under (50\%) & -- & -- \\
+4 & 4 & Matched & -- & -- \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Expected observations:}
+\begin{itemize}
+\item Matched compensation should yield highest Q-values
+\item Undercompensation (50\%) should show moderate performance
+\item No compensation should exhibit slowest convergence but eventual learning
+\end{itemize}
+
+\textbf{Figure 2 (to be generated):} Step response comparison showing output $Y(t)$ for PI, Q-before-learning, and Q-after-learning controllers (Model~3, $T_0=4$~s, matched compensation).
+
+\subsubsection{Projection Function Performance}
+
+To isolate the projection function's contribution, we will examine performance without dead time ($T_0 = 0$).
+
+\textbf{Table 2 (to be populated):} Performance metrics vs. PI baseline for $T_0=0$
+\begin{table}[htb]
+\centering
+\caption{Performance Metrics vs. PI Baseline ($T_0=0$) - \textit{Results Pending}}
+\label{tab:performance_metrics_T0_0}
+\begin{tabular}{clcccc}
+\hline
+\textbf{Model} & \textbf{Metric} & \textbf{PI} & \textbf{Q-init} & \textbf{Q-500ep} & \textbf{Q-2500ep} \\
+\hline
+1 & IAE & -- & -- & -- & -- \\
+1 & Overshoot [\%] & -- & -- & -- & -- \\
+1 & Settling [s] & -- & -- & -- & -- \\
+3 & IAE & -- & -- & -- & -- \\
+3 & Overshoot [\%] & -- & -- & -- & -- \\
+3 & Settling [s] & -- & -- & -- & -- \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Key validation points:}
+\begin{itemize}
+\item Q-initial metrics should closely match PI (bumpless initialization verification)
+\item Q-final metrics should show improvement over PI (learning effectiveness)
+\item Second-order model (Model~3) expected to show more challenging dynamics than first-order (Model~1)
+\end{itemize}
+
+\textbf{Figure 3 (to be generated):} Training progression showing output $Y(t)$, control $U(t)$, and error $e(t)$ at epochs 0, 500, 1000, and 2500 for Model~3 with $T_0=0$.
+
+\subsubsection{Combined Dead Time and Projection Performance}
+
+We will evaluate overall performance across all dead time scenarios with matched compensation.
+
+\textbf{Table 3 (to be populated):} IAE comparison across dead time scenarios
+\begin{table}[htb]
+\centering
+\caption{IAE Values for Matched Compensation - \textit{Results Pending}}
+\label{tab:iae_values}
+\begin{tabular}{ccccc}
+\hline
+\textbf{Model} & \textbf{Controller} & \textbf{$T_0=0$} & \textbf{$T_0=2$} & \textbf{$T_0=4$} \\
+\hline
+1 & PI & -- & -- & -- \\
+1 & Q-2500ep & -- & -- & -- \\
+3 & PI & -- & -- & -- \\
+3 & Q-2500ep & -- & -- & -- \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Expected trend:} Dead time should degrade absolute IAE for both PI and Q-learning, but Q-learning should maintain relative advantage.
+
+\textbf{Table 4 (to be populated):} Effect of compensation strategy on performance
+\begin{table}[htb]
+\centering
+\caption{IAE for Different Compensation Strategies (Model~3) - \textit{Results Pending}}
+\label{tab:compensation_strategy_impact}
+\begin{tabular}{cccc}
+\hline
+\textbf{$T_0$ [s]} & \textbf{None ($T_{0,c}=0$)} & \textbf{Under ($T_{0,c}=T_0/2$)} & \textbf{Matched ($T_{0,c}=T_0$)} \\
+\hline
+2 & -- & -- & -- \\
+4 & -- & -- & -- \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Key hypothesis to test:} Even 50\% undercompensation should provide substantially better performance than no compensation.
+
+\textbf{Figure 4 (to be generated):} Performance comparison matrix showing IAE, overshoot, and settling time for $T_0 \in \{0, 2, 4\}$~s with matched compensation.
+
+\textbf{Figure 5 (to be generated):} Load disturbance rejection comparison between PI and Q-after-learning for $T_0=2$~s, showing faster recovery time.
+
+
+\subsection{Summary of Validation Approach}
+\label{subsec:validation_summary}
+
+Our validation strategy systematically evaluates:
+
+\begin{enumerate}
+\item \textbf{Bumpless Initialization:} Q-initial performance should match PI across all scenarios
+\item \textbf{Learning Effectiveness:} Q-2500ep should outperform PI when dead time is properly compensated
+\item \textbf{Dead Time Compensation:} Matched compensation ($T_{0,c} = T_0$) should yield best results
+\item \textbf{Robustness:} Undercompensation ($T_{0,c} = T_0/2$) should still provide significant benefit over no compensation
+\item \textbf{Projection Function:} Should enable bumpless switching despite $T_e = 10$~s vs. $T_I = 20$~s mismatch
+\end{enumerate}
+
+The 14 experimental scenarios (7 per model) provide comprehensive coverage of the design space defined by process order, dead time magnitude, and compensation strategy. All performance metrics are computed from verification experiments run in pure exploitation mode ($\varepsilon = 0$) to eliminate the influence of exploratory actions.
+
+\textit{[Actual numerical results, completed tables, and generated figures will be inserted here after experimental runs are completed.]}

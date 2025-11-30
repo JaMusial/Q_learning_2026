@@ -1,0 +1,19 @@
+% ========================================================================
+% ABSTRACT
+% ========================================================================
+% Based on ASC submission style and Q2d methodology
+% Target: 200-250 words
+% ========================================================================
+
+\begin{abstract}
+The performance of a significant majority of industrial proportional-integral-derivative (PID) controllers remains suboptimal due to inadequate tuning. Manual retuning requires expert knowledge and experimental data, making it impractical for large-scale industrial facilities operating hundreds of control loops simultaneously. This challenge is further compounded when processes exhibit significant dead time, which degrades closed-loop performance and complicates traditional compensation methods such as Smith Predictor or Internal Model Control, both of which require accurate process models.
+
+This paper presents a model-free Q-learning controller with two key extensions that address these industrial challenges. First, a projection function enables operation with desired time constants differing from the baseline PI tuning, compensating for the mismatch through an additional control term derived from first-order trajectory requirements. Second, a delayed credit assignment mechanism handles dead time compensation by decoupling the physical plant delay from the controller's compensation strategy, implemented through FIFO buffers that defer Q-value updates until action consequences become observable.
+
+The proposed Q2d controller bumplessly replaces existing PI controllers, starting with equivalent initial performance and gradually improving online through reinforcement learning without requiring a process model or offline training. Validation on first- and second-order inertia processes with dead times up to 4 seconds demonstrates 12--22\% improvement in integral absolute error compared to PI baseline. Notably, the method exhibits graceful degradation: even 50\% undercompensation of dead time (setting $T_{0,\text{controller}} = T_0/2$) provides substantially better performance than no compensation, offering robustness to uncertain dead time estimates common in industrial practice.
+
+\end{abstract}
+
+\begin{IEEEkeywords}
+Q-learning, dead time compensation, projection function, industrial control, reinforcement learning, bumpless switching, model-free control, delayed credit assignment
+\end{IEEEkeywords}

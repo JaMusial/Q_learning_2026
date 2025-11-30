@@ -1,0 +1,100 @@
+% ========================================================================
+% SECTION 2: PROBLEM STATEMENT (CORRECTED VERSION)
+% ========================================================================
+% Changes:
+% - First person
+% - Uppercase symbols Y(t), U(t), lowercase e(t) for error, Ysp
+% - Consistent with Q2dPLC notation
+% - Updated: Error symbol changed from E to e throughout
+% ========================================================================
+
+\section{Problem Statement}
+\label{sec:problem_statement}
+
+\subsection{Q-Learning Fundamentals}
+\label{subsec:q_learning_basics}
+
+Q-learning is a model-free reinforcement learning algorithm that learns optimal control policies through interaction with an environment~\cite{watkins1989,sutton2018}. The agent observes the current state $s \in \mathcal{S}$, selects an action $a \in \mathcal{A}$, receives a scalar reward $R \in \mathbb{R}$, and transitions to a new state $s' \in \mathcal{S}$. The objective is to learn a policy $\pi: \mathcal{S} \rightarrow \mathcal{A}$ that maximizes the expected cumulative discounted reward:
+%
+\begin{equation}
+G_t = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}
+\label{eq:cumulative_reward}
+\end{equation}
+%
+where $\gamma \in [0,1)$ is the discount factor that determines the relative importance of immediate versus future rewards.
+
+The Q-function $Q(s,a)$ represents the expected cumulative reward for taking action $a$ in state $s$ and following an optimal policy thereafter:
+%
+\begin{equation}
+Q^*(s,a) = \mathbb{E}\left[ R + \gamma \max_{a'} Q^*(s',a') \mid s, a \right]
+\label{eq:q_function_optimal}
+\end{equation}
+%
+The Q-learning algorithm iteratively updates Q-value estimates based on observed transitions using the temporal difference (TD) error:
+%
+\begin{equation}
+Q(s,a) \leftarrow Q(s,a) + \alpha \left[ R + \gamma \max_{a'} Q(s',a') - Q(s,a) \right]
+\label{eq:q_learning_update}
+\end{equation}
+%
+where $\alpha \in (0,1]$ is the learning rate. Under appropriate conditions (all state-action pairs visited infinitely often, learning rate decay), Q-learning converges to the optimal Q-function $Q^*$~\cite{watkins1992}.
+
+Action selection balances exploration (trying new actions to discover potentially better policies) and exploitation (selecting actions with highest current Q-values). The $\varepsilon$-greedy strategy provides a simple yet effective approach:
+%
+\begin{equation}
+a = \begin{cases}
+\arg\max_{a'} Q(s,a') & \text{with probability } 1-\varepsilon \\
+\text{random action} & \text{with probability } \varepsilon
+\end{cases}
+\label{eq:epsilon_greedy}
+\end{equation}
+%
+where $\varepsilon \in [0,1]$ controls the exploration rate.
+
+
+\subsection{Control Objective and Target Trajectory}
+\label{subsec:control_objective}
+
+We consider a single-input single-output (SISO) dynamical process with control signal $U(t)$, process output $Y(t)$, setpoint $Y_{sp}(t)$, and control error $e(t) = Y_{sp}(t) - Y(t)$. The control objective is to drive the error to zero while satisfying constraints on control effort and avoiding excessive oscillations.
+
+We define the desired closed-loop behavior through a first-order trajectory requirement:
+%
+\begin{equation}
+\dot{e}(t) + \frac{1}{T_e} e(t) = 0
+\label{eq:target_trajectory}
+\end{equation}
+%
+where $T_e > 0$ is the desired closed-loop time constant and $\dot{e}(t) = de/dt$ is the error derivative. The analytical solution to~\eqref{eq:target_trajectory} is:
+%
+\begin{equation}
+e(t) = e_0 \exp\left(-\frac{t}{T_e}\right)
+\label{eq:trajectory_solution}
+\end{equation}
+%
+which represents exponential decay of the error with time constant $T_e$. Smaller $T_e$ values correspond to faster response but may require more aggressive control action.
+
+This trajectory formulation provides an intuitive link to existing PI controller tunings. A standard PI controller in velocity form can be expressed as:
+%
+\begin{equation}
+\Delta U_{\text{PI}}(t) = K_{PI} T_s \left[ \dot{e}(t) + \frac{1}{T_I} e(t) \right]
+\label{eq:pi_velocity_form}
+\end{equation}
+%
+where $K_{PI}$ is the proportional gain, $T_I$ is the integral time, and $T_s$ is the sampling time. Comparing~\eqref{eq:pi_velocity_form} with~\eqref{eq:target_trajectory} reveals the structural similarity: the PI controller attempts to drive the error along a trajectory defined by $T_I$.
+
+
+\subsection{Dead Time Challenge}
+\label{subsec:deadtime_challenge}
+
+Many industrial processes exhibit significant dead time (also called transport delay or time delay) between control action and measured output:
+%
+\begin{equation}
+Y(t) = G(s) \cdot e^{-T_0 s} \cdot U(t)
+\label{eq:process_with_deadtime}
+\end{equation}
+%
+where $G(s)$ is the process transfer function without delay and $T_0 \geq 0$ is the dead time. Physical sources of dead time include material transport through pipes, distance-velocity lags in continuous processes, measurement sensor delays, actuator response times, and communication latencies in distributed control systems.
+
+Dead time poses a fundamental challenge for Q-learning: the standard update rule~\eqref{eq:q_learning_update} assumes that the consequence of action $a(t)$ is observable in the next state $s(t+T_s)$. When dead time $T_0$ spans multiple sampling intervals ($T_0 \gg T_s$), the control action $U(t)$ only affects the measured output at time $t + T_0$. This creates a \emph{credit assignment problem}---when the controller observes state $s(t)$ at time $t$, which past action is responsible?
+
+Without proper credit assignment, Q-learning may update the wrong state-action pairs or converge slowly. For example, if $T_0 = 4$~s and $T_s = 0.1$~s, the plant output at time $t$ reflects the control action applied 40 time steps earlier, not the action $a(t)$ just selected. Applying~\eqref{eq:q_learning_update} would incorrectly associate $s(t+T_s)$ with $a(t)$, leading to poor or failed learning. In Section~\ref{sec:deadtime_compensation}, we address this through delayed credit assignment using FIFO buffers that defer Q-value updates until action consequences become observable.

@@ -1,0 +1,109 @@
+% ========================================================================
+% MAIN MANUSCRIPT FILE
+% Q2d Q-Learning with Projection Function and Dead Time Compensation
+% ========================================================================
+% Compiles all sections into complete manuscript
+% Target journal: IEEE Transactions on Control Systems Technology (or similar)
+% ========================================================================
+
+\documentclass[journal]{IEEEtran}
+
+% ========================================================================
+% PACKAGES
+% ========================================================================
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{multirow}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{hyperref}
+
+% ========================================================================
+% DOCUMENT METADATA
+% ========================================================================
+\title{Model-Free Q-Learning Controller with Projection Function and Dead Time Compensation for Industrial Process Control}
+
+\author{Jakub~Musiał,
+        Krzysztof~Stebel,
+        and~Jacek~Czeczot,~\IEEEmembership{Member,~IEEE}
+\thanks{J. Musiał, K. Stebel, and J. Czeczot are with the Department of Automatic Control and Robotics, Faculty of Automatic Control, Electronics and Computer Science, Silesian University of Technology, 44-100 Gliwice, Poland (e-mail: jakub.musial@polsl.pl; krzysztof.stebel@polsl.pl; jacek.czeczot@polsl.pl).}
+\thanks{Manuscript received Month DD, 2025; revised Month DD, 2025.}}
+
+% ========================================================================
+% DOCUMENT BEGIN
+% ========================================================================
+\begin{document}
+
+\maketitle
+
+% ========================================================================
+% ABSTRACT
+% ========================================================================
+\input{01_abstract.tex}
+
+% ========================================================================
+% INTRODUCTION
+% ========================================================================
+\input{02_introduction.tex}
+
+% ========================================================================
+% PROBLEM STATEMENT
+% ========================================================================
+\input{03_problem_statement.tex}
+
+% ========================================================================
+% Q2D CONTROLLER WITH PROJECTION FUNCTION
+% ========================================================================
+\input{04_q2d_projection.tex}
+
+% ========================================================================
+% DEAD TIME COMPENSATION
+% ========================================================================
+\input{05_deadtime_compensation.tex}
+
+% ========================================================================
+% VALIDATION AND RESULTS
+% ========================================================================
+\input{06_validation_results.tex}
+
+% ========================================================================
+% DISCUSSION
+% ========================================================================
+\input{07_discussion.tex}
+
+% ========================================================================
+% CONCLUSIONS
+% ========================================================================
+\input{08_conclusions.tex}
+
+% ========================================================================
+% ACKNOWLEDGMENTS
+% ========================================================================
+\input{09_acknowledgments.tex}
+
+% ========================================================================
+% REFERENCES
+% ========================================================================
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+% ========================================================================
+% BIOGRAPHIES (Optional - some journals require)
+% ========================================================================
+% \begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{photo_jakub.jpg}}]{Jakub Musiał}
+% received the M.Sc. degree in automatic control and robotics from Silesian University of Technology...
+% \end{IEEEbiography}
+%
+% \begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{photo_krzysztof.jpg}}]{Krzysztof Stebel}
+% received the Ph.D. degree in automatic control from Silesian University of Technology...
+% \end{IEEEbiography}
+%
+% \begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{photo_jacek.jpg}}]{Jacek Czeczot}
+% (M'XX) received the Ph.D. degree in automatic control from Silesian University of Technology...
+% \end{IEEEbiography}
+
+\end{document}

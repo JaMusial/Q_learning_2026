@@ -1,0 +1,157 @@
+% ========================================================================
+% SECTION 6: DISCUSSION
+% ========================================================================
+% Structure: 3 subsections (1.2 pages total)
+% Interprets results and discusses practical implications
+% ========================================================================
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Projection Function Analysis}
+\label{subsec:discussion_projection}
+
+The projection function~\eqref{eq:projection_term} successfully enables Q2d operation with $T_e \neq T_I$, as evidenced by the stable learning and performance improvements demonstrated in Section~\ref{subsec:projection_performance}. However, the choice of time constant ratio $T_e/T_I$ significantly influences both learning behavior and achievable performance gains.
+
+\subsubsection{Moderate Ratio Strategy}
+
+In this work, we employed $T_e = 10$~s with $T_I = 20$~s, yielding a ratio $T_e/T_I = 0.5$. This moderate 2$\times$ speed-up provides several advantages:
+
+\noindent\textbf{1. Manageable Projection Magnitude:} The projection term magnitude is proportional to $(1/T_e - 1/T_I) = 0.05$~s$^{-1}$. For typical errors in the range $\pm 20\%$, projection contributions remain comparable to Q-learning control increments, avoiding dominance by one term over the other.
+
+\noindent\textbf{2. Smooth Learning Convergence:} As shown in Table~\ref{tab:performance_metrics_T0_0}, learning progresses monotonically without oscillations or instability. The Q-values converge to levels near 95, close to the theoretical limit of $1/(1-\gamma) = 100$ for $\gamma = 0.99$.
+
+\noindent\textbf{3. Meaningful Performance Gains:} The 2$\times$ speed-up translates to 20--22\% IAE reduction without dead time, providing industrially significant improvement while maintaining conservative operation.
+
+\subsubsection{Extreme Ratio Challenges}
+
+Preliminary investigations (not reported here in detail) with larger ratios such as $T_e = 2$~s and $T_I = 20$~s (ratio $T_e/T_I = 0.1$, representing a 10$\times$ speed-up) revealed limitations:
+
+\begin{itemize}
+\item \textbf{Projection Dominance:} The term $(1/T_e - 1/T_I) = 0.45$~s$^{-1}$ becomes large, causing projection corrections to overwhelm Q-learning contributions. The controller behavior becomes increasingly similar to direct PI control with modified time constant rather than true learning-based adaptation.
+
+\item \textbf{Limit Cycle Tendency:} For large errors, projection magnitudes can drive rapid control changes that overshoot, creating oscillatory behavior between a small number of states without effective exploration of the full state space.
+
+\item \textbf{Convergence Ceiling:} Q-value convergence stalls at lower levels (e.g., 70--80 instead of 95+), and performance improvements plateau earlier in training.
+\end{itemize}
+
+These observations suggest that projection-based compensation works well for moderate mismatches (ratio $\approx 0.3$--$0.7$) but struggles with extreme ratios ($< 0.2$ or $> 3$). For applications requiring large time constant changes, alternative approaches such as staged learning with gradual $T_e$ reduction~\cite{musial2025} may be more appropriate. Staged learning avoids large projection magnitudes by maintaining small $T_e - T_I$ differences at any given time, though at the cost of longer total training duration.
+
+
+\subsection{Dead Time Compensation Effectiveness}
+\label{subsec:discussion_deadtime}
+
+The delayed credit assignment mechanism (Section~\ref{sec:deadtime_compensation}) demonstrates robust performance across a range of dead time values and compensation strategies, providing several insights relevant to industrial deployment.
+
+\subsubsection{Matched Compensation Performance}
+
+When $T_{0,\text{controller}} = T_0$ (perfect knowledge), the method achieves near-baseline learning performance even for significant dead time ($T_0 = 4$~s $= 40 \Delta t$). Table~\ref{tab:q_convergence} shows that $Q(50,50)$ reaches 93.5 for $T_0 = 4$~s compared to 96.7 for $T_0 = 0$~s---only a 3.3\% degradation despite the substantial delay. This validates the theoretical correctness of the buffer-based timing synchronization (Section~\ref{subsec:delayed_credit_assignment}).
+
+Control performance degradation is more pronounced: IAE improvement drops from 21.2\% ($T_0=0$) to 11.4\% ($T_0=4$) for Model~3 (Table~\ref{tab:iae_improvement}). This discrepancy between Q-value convergence and control performance reflects a fundamental challenge: while the Q-learning algorithm correctly assigns credit, dead time inherently limits closed-loop bandwidth and responsiveness regardless of controller sophistication.
+
+\subsubsection{Robustness to Undercompensation}
+
+A particularly valuable finding for industrial practice is the graceful degradation exhibited under undercompensation. Table~\ref{tab:compensation_strategy_impact} demonstrates that 50\% undercompensation ($T_{0,c} = 2$~s for $T_0 = 4$~s) achieves 9.7\% IAE improvement---85\% of the matched compensation result (11.4\%) and more than double the no-compensation performance (4.3\%).
+
+This robustness has important implications:
+
+\noindent\textbf{1. Approximate Estimates Sufficient:} Industrial practitioners rarely know dead time precisely. Process conditions vary, measurement delays fluctuate with sensor health, and actuator response times drift with wear. The ability to achieve substantial benefit with rough estimates (e.g., $T_0 \approx 2$--$4$~s) reduces commissioning requirements and enhances practical applicability.
+
+\noindent\textbf{2. Conservative Tuning Viable:} A conservative strategy of setting $T_{0,c} = 0.5 T_0$ (i.e., deliberately underestimating by 50\%) provides significant improvement with low risk of instability that might arise from overcompensation.
+
+\noindent\textbf{3. Adaptive Extension Opportunity:} While not implemented in this work, the graceful degradation suggests that adaptive estimation of $T_{0,c}$ during operation could be beneficial. Starting with $T_{0,c} = 0$ and gradually increasing based on convergence metrics could automatically tune the compensation without requiring prior knowledge.
+
+\subsubsection{Comparison to Model-Based Methods}
+
+Traditional dead time compensation techniques such as Smith Predictor~\cite{smith1957} and Internal Model Control (IMC)~\cite{morari1989} require accurate process models including precise dead time and dynamics. Model mismatch, particularly dead time error, can cause performance degradation or instability.
+
+The Q-learning approach with delayed credit assignment offers complementary advantages:
+
+\begin{itemize}
+\item \textbf{Model-Free:} No identification of process transfer function required; only approximate dead time estimate needed
+\item \textbf{Graceful Degradation:} 50\% estimation error still provides substantial benefit; no instability risk
+\item \textbf{Adaptive to Changes:} Continued learning can adapt to time-varying processes; model-based methods require reidentification
+\item \textbf{Bumpless Deployment:} Initialization from PI tunings ensures acceptable performance from start; Smith Predictor typically requires retuning
+\end{itemize}
+
+The primary disadvantage remains learning time: achieving near-optimal performance requires 1000--2500 epochs (days to weeks in industrial operation depending on disturbance frequency), whereas model-based methods provide immediate optimal performance if the model is accurate. Hybrid approaches combining initial model-based compensation with gradual Q-learning refinement merit future investigation.
+
+\subsubsection{Computational Overhead}
+
+Buffer operations (push/pop) add minimal computational overhead: approximately $3 \times N_{\text{buffer}}$ array accesses per control cycle. For $T_0 = 4$~s and $\Delta t = 0.1$~s, $N_{\text{buffer}} = 40$, requiring $\sim 120$ operations---negligible compared to the Q-matrix lookup and max-operation ($\sim N_s = 100$ comparisons). Measured CPU time increases by less than 0.5\% when enabling dead time compensation, making the approach suitable for real-time implementation on industrial controllers including PLCs.
+
+
+\subsection{Practical Considerations for Industrial Deployment}
+\label{subsec:practical_considerations}
+
+\subsubsection{Tuning Guidelines}
+
+Based on the validation results, we propose the following commissioning procedure for industrial deployment:
+
+\begin{enumerate}
+\item \textbf{Baseline PI Tuning:} Obtain or verify existing PI controller tunings ($K_P$, $T_I$). These need not be optimal---the Q-learning will improve upon them.
+
+\item \textbf{Controller Gain:} Set $K_Q = K_P$ to ensure bumpless switching.
+
+\item \textbf{Target Time Constant:} Choose $T_e$ based on desired speed-up:
+   \begin{itemize}
+   \item Conservative: $T_e = 0.7 T_I$ (30\% faster)
+   \item Moderate: $T_e = 0.5 T_I$ (2$\times$ faster, recommended)
+   \item Aggressive: $T_e = 0.3 T_I$ (3$\times$ faster, advanced users only)
+   \end{itemize}
+
+\item \textbf{Dead Time Estimation:} Measure or estimate process dead time $T_0$:
+   \begin{itemize}
+   \item Experimental: Apply step change, measure response delay
+   \item Engineering knowledge: Sum known delays (transport, sensor, actuator)
+   \item Uncertainty handling: Use $T_{0,c} = 0.5 T_0$ for robustness
+   \end{itemize}
+
+\item \textbf{Dead Time Compensation Strategy:}
+   \begin{itemize}
+   \item No estimate available: $T_{0,c} = 0$ (still learns, slower)
+   \item Approximate estimate: $T_{0,c} = 0.5 T_0$ (good compromise)
+   \item Confident estimate: $T_{0,c} = T_0$ (best performance)
+   \end{itemize}
+
+\item \textbf{Learning Parameters:} Default values ($\alpha = 0.1$, $\gamma = 0.99$, $\varepsilon = 0.3$, $RD = 3$) work well across tested scenarios. Conservative tuning uses smaller $\varepsilon$ and $RD$ to reduce exploration disturbances.
+
+\item \textbf{Monitoring:} Track $Q(s_{\text{goal}}, a_{\text{goal}})$ and IAE over epochs. Convergence to $Q(50,50) > 90$ typically indicates good learning.
+\end{enumerate}
+
+\subsubsection{Applicability Range}
+
+The proposed method is most suitable for:
+
+\begin{itemize}
+\item Single-loop continuous control (SISO systems)
+\item Processes dominated by inertia dynamics (1st--2nd order)
+\item Dead times up to $T_0 \approx 0.2 T_I$ (e.g., $T_0 = 4$~s for $T_I = 20$~s)
+\item Applications tolerating gradual improvement over days/weeks
+\item Situations where process models are unavailable or costly to obtain
+\end{itemize}
+
+Limitations include:
+
+\begin{itemize}
+\item Higher-order dynamics (3rd order+) require larger Q-matrices and longer learning
+\item Highly oscillatory or poorly damped systems may require parameter tuning
+\item Very large dead times ($T_0 > 0.5 T_I$) challenge any control method; specialized techniques needed
+\item Batch processes with insufficient repetitions for learning may not accumulate enough experience
+\end{itemize}
+
+\subsubsection{Safety and Acceptance}
+
+Industrial deployment of learning controllers raises safety concerns. The proposed approach addresses these through:
+
+\noindent\textbf{Bumpless Initialization:} No performance degradation at deployment; existing process operation undisturbed.
+
+\noindent\textbf{Constrained Exploration:} The $\varepsilon$-greedy strategy with $RD$ limits intentional disturbances. Setting $\varepsilon = 0.2$ and $RD = 2$ provides conservative learning.
+
+\noindent\textbf{Saturation Handling:} Learning disabled when control saturates; prevents anti-windup issues.
+
+\noindent\textbf{Fallback Option:} Controller can revert to exploitation-only mode ($\varepsilon = 0$) if learning becomes undesirable, effectively freezing the learned policy.
+
+\noindent\textbf{Gradual Improvement:} Unlike sudden controller replacement, performance improves incrementally, allowing operators to build trust.
+
+These features position the method as a low-risk enhancement to existing control infrastructure rather than a disruptive replacement.

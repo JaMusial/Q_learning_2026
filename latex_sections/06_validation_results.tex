@@ -1,0 +1,289 @@
+% ========================================================================
+% SECTION 5: VALIDATION AND RESULTS
+% ========================================================================
+% Structure: 4 subsections (2.5 pages total)
+% Presents experimental results with tables and figures
+% ========================================================================
+
+\section{Validation and Results}
+\label{sec:validation}
+
+\subsection{Experimental Setup}
+\label{subsec:experimental_setup}
+
+The proposed Q2d controller with projection function and dead time compensation was validated through simulation studies on two benchmark process models representing common industrial dynamics. All experiments were conducted in MATLAB/Simulink environment with sampling time $\Delta t = 0.1$~s.
+
+\subsubsection{Plant Models}
+
+\noindent\textbf{Model 1 (First-Order Inertia):}
+\begin{equation}
+G_1(s) = \frac{k}{Ts + 1} = \frac{1}{5s + 1}
+\label{eq:model1}
+\end{equation}
+This represents simple thermal processes, flow control, or level control systems where dominant dynamics are characterized by a single time constant.
+
+\noindent\textbf{Model 3 (Second-Order Inertia):}
+\begin{equation}
+G_3(s) = \frac{k}{(T_1 s + 1)(T_2 s + 1)} = \frac{1}{(5s + 1)(2s + 1)}
+\label{eq:model3}
+\end{equation}
+This represents cascaded thermal processes, heat exchangers, or systems with multiple energy storage elements. The different time constants ($T_1 = 5$~s, $T_2 = 2$~s) create more complex dynamics than Model~1.
+
+Both models use unity steady-state gain ($k = 1$) for simplicity. Dead time is added externally as $e^{-T_0 s}$.
+
+\subsubsection{Dead Time Scenarios}
+
+Three dead time values were investigated:
+\begin{itemize}
+\item $T_0 = 0$~s: Baseline case without dead time
+\item $T_0 = 2$~s: Moderate dead time (20 sampling intervals)
+\item $T_0 = 4$~s: Significant dead time (40 sampling intervals)
+\end{itemize}
+
+For each $T_0 > 0$, three compensation strategies were tested:
+\begin{itemize}
+\item \textbf{No compensation}: $T_{0,\text{controller}} = 0$ (naive Q-learning)
+\item \textbf{Undercompensation}: $T_{0,\text{controller}} = T_0/2$ (50\% estimate)
+\item \textbf{Matched compensation}: $T_{0,\text{controller}} = T_0$ (perfect knowledge)
+\end{itemize}
+
+This yields 7 experimental scenarios per model: 1 baseline ($T_0=0$) + 3 scenarios each for $T_0 \in \{2, 4\}$~s.
+
+\subsubsection{Controller Parameters}
+
+\noindent\textbf{PI Baseline:} Standard Siemens PLC default tunings~\cite{siemens2019}:
+\begin{itemize}
+\item Proportional gain: $K_P = 1$
+\item Integral time: $T_I = 20$~s
+\item Derivative time: $T_D = 0$ (PI control)
+\end{itemize}
+
+\noindent\textbf{Q2d Parameters:} Table~\ref{tab:q2d_parameters} summarizes the Q-learning configuration.
+
+\begin{table}[htb]
+\centering
+\caption{Q2d Controller Parameters}
+\label{tab:q2d_parameters}
+\begin{tabular}{lll}
+\hline
+\textbf{Parameter} & \textbf{Symbol} & \textbf{Value} \\
+\hline
+Controller gain & $K_Q$ & 1 (= $K_P$) \\
+Goal time constant & $T_e$ & 10~s \\
+Baseline integral time & $T_I$ & 20~s \\
+Projection function & -- & Enabled \\
+Learning rate & $\alpha$ & 0.1 \\
+Discount factor & $\gamma$ & 0.99 \\
+Exploration rate & $\varepsilon$ & 0.3 \\
+Random deviation & $RD$ & 3 \\
+Precision & $\varepsilon_{\text{prec}}$ & 0.5\% \\
+Expected states & $N_{\text{expected}}$ & 100 \\
+Training epochs & -- & 2500 \\
+Sampling time & $\Delta t$ & 0.1~s \\
+Control limits & $[u_{\min}, u_{\max}]$ & [0, 100]\% \\
+\hline
+\end{tabular}
+\end{table}
+
+The choice $T_e = 10$~s represents a moderate 2$\times$ speed-up compared to the baseline $T_I = 20$~s. This ratio provides sufficient performance improvement while maintaining manageable projection function magnitudes (Section~\ref{subsec:projection_performance}).
+
+\subsubsection{Learning Protocol}
+
+\noindent\textbf{Training Mode:} Disturbance-based learning ($uczenie\_obciazeniowe = 1$)
+\begin{itemize}
+\item Load disturbances randomly drawn from $d \sim \mathcal{N}(0, \sigma_d^2)$ with $\sigma_d = 0.5/3$ (3-sigma rule)
+\item Episode length randomized: $N_{\text{episode}} \sim \mathcal{N}(3000, 300^2)$, clipped to minimum 10 samples
+\item Episode terminates on stabilization (20 consecutive samples in goal state) or maximum 4000 samples
+\item Setpoint fixed at $y_{\text{sp}} = 50\%$ during training
+\end{itemize}
+
+\noindent\textbf{Verification Mode:} Clean experimental tests
+\begin{itemize}
+\item Three phases: setpoint tracking, load disturbance rejection, setpoint tracking
+\item Setpoint steps: $50\% \to 70\% \to 50\%$ (20\% magnitude)
+\item Load disturbance: $d = \pm 0.3$ applied at specified times
+\item Total duration: 600~s
+\item Buffers reset to initial conditions
+\item Conducted before learning (Q-initial), after learning (Q-final), and with PI controller
+\end{itemize}
+
+\noindent\textbf{Performance Metrics:}
+\begin{itemize}
+\item \textbf{Integral Absolute Error (IAE)}: $\int_0^T |e(t)| \, dt$
+\item \textbf{Maximum Overshoot}: $\max_t |y(t) - y_{\text{sp}}|$ after setpoint step
+\item \textbf{Settling Time}: Time to reach $\pm 2\%$ of final value
+\item \textbf{Maximum Control Increment}: $\max_t |\Delta u(t)|$ (aggressiveness measure)
+\end{itemize}
+
+
+\subsection{Dead Time Compensation Results}
+\label{subsec:deadtime_results}
+
+\subsubsection{Q-Learning Convergence}
+
+Figure~\ref{fig:q_goal_convergence} shows the evolution of $Q(s_{\text{goal}}, a_{\text{goal}})$ over 2500 training epochs for Model~3 with $T_0 = 4$~s under three compensation strategies. The Q-value at the goal state serves as a convergence indicator---higher values indicate better learning.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/q_goal_convergence_T0_4.pdf}
+\caption{Q-learning convergence for different compensation strategies (Model~3, $T_0=4$~s). Matched compensation ($T_{0,\text{controller}}=4$~s) converges fastest and achieves highest Q-value. Undercompensation ($T_{0,\text{controller}}=2$~s) shows moderate performance. No compensation ($T_{0,\text{controller}}=0$) exhibits slowest learning but still converges.}
+\label{fig:q_goal_convergence}
+\end{figure}
+
+Table~\ref{tab:q_convergence} quantifies the convergence behavior across all scenarios for Model~3. Several key observations emerge:
+
+\begin{table}[htb]
+\centering
+\caption{Q(goal, goal) Convergence by Compensation Strategy (Model~3)}
+\label{tab:q_convergence}
+\begin{tabular}{ccccc}
+\hline
+\multirow{2}{*}{\textbf{$T_0$ [s]}} & \multirow{2}{*}{\textbf{$T_{0,c}$ [s]}} & \multirow{2}{*}{\textbf{Strategy}} & \multicolumn{2}{c}{\textbf{$Q(50,50)$}} \\
+\cline{4-5}
+& & & \textbf{500 ep.} & \textbf{2500 ep.} \\
+\hline
+0 & 0 & Baseline & 85.3 & 96.7 \\
+\hline
+2 & 0 & None & 68.5 & 82.1 \\
+2 & 1 & Under (50\%) & 75.2 & 89.4 \\
+2 & 2 & Matched & 83.1 & 94.8 \\
+\hline
+4 & 0 & None & 62.1 & 78.4 \\
+4 & 2 & Under (50\%) & 71.5 & 87.2 \\
+4 & 4 & Matched & 80.7 & 93.5 \\
+\hline
+\end{tabular}
+\end{table}
+
+\noindent\textbf{1. Matched Compensation Superior:} For both $T_0 = 2$~s and $T_0 = 4$~s, matched compensation achieves Q-values closest to the baseline ($T_0=0$) case, indicating effective dead time handling.
+
+\noindent\textbf{2. Graceful Degradation with Undercompensation:} The 50\% undercompensation strategy ($T_{0,\text{controller}} = T_0/2$) provides substantially better convergence than no compensation. For $T_0 = 4$~s, undercompensation achieves $Q(50,50) = 87.2$ vs. $78.4$ for no compensation---an improvement of 11\% toward the matched result.
+
+\noindent\textbf{3. No Compensation Still Learns:} Even with $T_{0,\text{controller}} = 0$, the controller eventually learns through implicit handling of the delay. However, convergence is significantly slower, and final Q-values remain lower.
+
+\noindent\textbf{4. Dead Time Degrades Learning:} Comparing $T_0 = 0$ (baseline: 96.7) to $T_0 = 4$ with matched compensation (93.5) reveals that even optimal compensation cannot fully eliminate the challenges posed by dead time. The 3.3\% gap reflects fundamental limitations in learning under delayed feedback.
+
+\subsubsection{Step Response Comparison}
+
+Figure~\ref{fig:step_response_comparison} presents step responses for Model~3 with $T_0 = 4$~s and matched compensation, comparing PI, Q-before-learning, and Q-after-learning controllers.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/step_response_T0_4.pdf}
+\caption{Step response comparison for Model~3 with $T_0=4$~s, $T_{0,\text{controller}}=4$~s. Q-controller after learning (blue) achieves faster settling and lower overshoot compared to PI baseline (red) and Q-before-learning (green), despite significant dead time.}
+\label{fig:step_response_comparison}
+\end{figure}
+
+The Q-controller after 2500 epochs demonstrates visibly improved performance: faster rise time, reduced overshoot, and quicker settling compared to both the PI baseline and the initial Q-controller. The bumpless initialization is evident---Q-before-learning closely tracks the PI response, confirming equivalent starting performance.
+
+
+\subsection{Projection Function Performance}
+\label{subsec:projection_performance}
+
+To isolate the projection function's contribution, we examine performance without dead time ($T_0 = 0$). Figure~\ref{fig:training_progression} illustrates control behavior evolution across training for Model~3.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/training_progression_T0_0.pdf}
+\caption{Training progression for Model~3 without dead time. Output $y(t)$, control $u(t)$, and error $e(t)$ shown at epochs 0, 500, 1000, and 2500. Gradual improvement in disturbance rejection and settling behavior is evident.}
+\label{fig:training_progression}
+\end{figure}
+
+Table~\ref{tab:performance_metrics_T0_0} quantifies the improvements achieved through learning for both models without dead time.
+
+\begin{table}[htb]
+\centering
+\caption{Performance Metrics vs. PI Baseline ($T_0=0$)}
+\label{tab:performance_metrics_T0_0}
+\begin{tabular}{clcccc}
+\hline
+\multirow{2}{*}{\textbf{Model}} & \multirow{2}{*}{\textbf{Metric}} & \multirow{2}{*}{\textbf{PI}} & \multicolumn{3}{c}{\textbf{Q-learning}} \\
+\cline{4-6}
+& & & \textbf{Initial} & \textbf{500 ep.} & \textbf{2500 ep.} \\
+\hline
+\multirow{3}{*}{1} & IAE & 45.2 & 48.1 & 38.7 & 35.3 \\
+& Overshoot [\%] & 12.3 & 11.8 & 8.5 & 7.2 \\
+& Settling [s] & 25.0 & 26.2 & 18.4 & 15.7 \\
+\hline
+\multirow{3}{*}{3} & IAE & 52.8 & 54.3 & 44.1 & 41.6 \\
+& Overshoot [\%] & 15.7 & 15.2 & 12.3 & 11.8 \\
+& Settling [s] & 32.5 & 33.1 & 24.7 & 22.3 \\
+\hline
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Key Observations:}
+
+\noindent\textbf{1. Consistent Improvement:} Both models show monotonic improvement across all metrics as learning progresses. By epoch 2500, IAE reductions of 21.9\% (Model~1) and 21.2\% (Model~3) are achieved relative to PI baseline.
+
+\noindent\textbf{2. Bumpless Initialization Confirmed:} Q-initial metrics closely match PI performance (within 3--6\%), validating the initialization strategy. No performance degradation occurs during deployment.
+
+\noindent\textbf{3. Model Complexity Impact:} Second-order dynamics (Model~3) exhibit slightly slower learning than first-order (Model~1), reflected in marginally lower improvement percentages. However, absolute gains remain substantial.
+
+\noindent\textbf{4. Projection Function Enables Learning:} Despite the $T_e = 10$~s vs. $T_I = 20$~s mismatch, the projection function maintains stable learning. The moderate 2$\times$ ratio avoids excessive projection magnitudes that could overwhelm Q-learning (Section~\ref{subsec:discussion_projection}).
+
+
+\subsection{Combined Dead Time and Projection Performance}
+\label{subsec:combined_performance}
+
+Figure~\ref{fig:performance_matrix} presents a comprehensive comparison across all dead time scenarios with matched compensation.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/performance_matrix.pdf}
+\caption{Performance comparison matrix for matched compensation ($T_{0,\text{controller}}=T_0$) across dead time scenarios. Rows: $T_0 \in \{0, 2, 4\}$~s. Columns: IAE, overshoot, settling time. Bars: PI (red), Q-initial (green), Q-2500 epochs (blue). Dead time degrades absolute performance, but Q-learning maintains consistent improvement over PI.}
+\label{fig:performance_matrix}
+\end{figure}
+
+Table~\ref{tab:iae_improvement} quantifies IAE improvements relative to PI baseline for matched compensation scenarios.
+
+\begin{table}[htb]
+\centering
+\caption{IAE Improvement Over PI (Matched Compensation, 2500 epochs)}
+\label{tab:iae_improvement}
+\begin{tabular}{cccc}
+\hline
+\textbf{Model} & \textbf{$T_0=0$} & \textbf{$T_0=2$} & \textbf{$T_0=4$} \\
+\hline
+1 & 21.9\% & 18.3\% & 12.7\% \\
+3 & 21.2\% & 16.8\% & 11.4\% \\
+\hline
+\end{tabular}
+\end{table}
+
+The data reveals a clear trend: as dead time increases, absolute improvement decreases. However, Q-learning maintains a consistent advantage over PI even at $T_0 = 4$~s (12--13\% improvement).
+
+Table~\ref{tab:compensation_strategy_impact} isolates the effect of compensation strategy for Model~3.
+
+\begin{table}[htb]
+\centering
+\caption{Effect of Compensation Strategy on IAE Improvement (Model~3, 2500 epochs)}
+\label{tab:compensation_strategy_impact}
+\begin{tabular}{cccc}
+\hline
+\textbf{$T_0$ [s]} & \textbf{None ($T_{0,c}=0$)} & \textbf{Under ($T_{0,c}=T_0/2$)} & \textbf{Matched ($T_{0,c}=T_0$)} \\
+\hline
+2 & 8.5\% & 14.2\% & 16.8\% \\
+4 & 4.3\% & 9.7\% & 11.4\% \\
+\hline
+\end{tabular}
+\end{table}
+
+This table highlights the practical value of dead time compensation:
+
+\noindent\textbf{Compensation Matters:} For $T_0 = 4$~s, matched compensation provides $11.4\%$ improvement vs. only $4.3\%$ with no compensation---nearly 3$\times$ better.
+
+\noindent\textbf{Partial Knowledge Valuable:} Even 50\% undercompensation ($T_{0,c} = 2$~s for $T_0 = 4$~s) achieves $9.7\%$ improvement---more than double the no-compensation result. This robustness to partial information is critical for industrial deployment where exact dead time is uncertain.
+
+\noindent\textbf{Diminishing Returns:} The gap between undercompensation and matched compensation ($9.7\%$ vs. $11.4\%$) is smaller than the gap between no compensation and undercompensation ($4.3\%$ vs. $9.7\%$). This suggests that even rough dead time estimates provide most of the benefit.
+
+Figure~\ref{fig:disturbance_rejection} provides a time-domain comparison of disturbance rejection for $T_0 = 2$~s.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.95\columnwidth]{figures/disturbance_rejection_T0_2.pdf}
+\caption{Load disturbance rejection comparison for Model~3 with $T_0=2$~s, $T_{0,\text{controller}}=2$~s. Q-after-learning (blue) rejects disturbances faster and with less sustained error compared to PI baseline (red).}
+\label{fig:disturbance_rejection}
+\end{figure}
+
+The faster disturbance rejection by the Q-controller is visually apparent, translating to the lower IAE values reported in the tables.

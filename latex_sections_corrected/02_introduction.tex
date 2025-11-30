@@ -1,0 +1,61 @@
+% ========================================================================
+% SECTION 1: INTRODUCTION (CORRECTED VERSION)
+% ========================================================================
+% Changes:
+% - First person throughout ("we present", "our previous work")
+% - Uppercase symbols Y(t), U(t), lowercase e(t) for error
+% - Removed staged learning from research gaps
+% - Clarified projection enables initialization (not just mismatch handling)
+% - No specific numerical claims without data
+% - Updated: Error symbol changed from E to e throughout
+% ========================================================================
+
+\section{Introduction}
+\label{sec:introduction}
+
+\subsection{Industrial Motivation}
+\label{subsec:industrial_motivation}
+
+Proportional-integral-derivative (PID) controllers remain the dominant control solution in industrial process automation, with estimates suggesting their deployment in over 90\% of control loops across chemical plants, refineries, manufacturing facilities, and other process industries~\cite{bialkowski1996,desborough2002}. Despite this ubiquity, numerous studies indicate that approximately 60\% of industrial PID loops perform poorly due to inadequate tuning~\cite{desborough2002,ender1993}. The consequences include increased energy consumption, reduced product quality, higher raw material waste, and suboptimal process economics.
+
+Manual retuning of PID controllers requires expert knowledge of control theory, detailed understanding of process dynamics, and access to experimental data for parameter identification. In large industrial facilities operating hundreds or thousands of simultaneous control loops, systematic retuning becomes impractical due to economic constraints, operational risks associated with experimentation, and limited availability of qualified personnel. Existing automated tuning solutions, such as relay-based autotuning~\cite{astrom1984} or model-based optimization~\cite{skogestad2003}, either require process disruption for identification experiments or depend on accurate process models that are difficult to obtain and maintain for complex, time-varying industrial systems.
+
+The challenge is further compounded when processes exhibit significant dead time (transport delay), which is ubiquitous in industrial applications due to material transport through pipes, measurement delays, actuator dynamics, and communication latencies. Dead time severely degrades closed-loop performance and stability margins, necessitating specialized compensation techniques. Traditional approaches such as the Smith Predictor~\cite{smith1957} and Internal Model Control (IMC)~\cite{morari1989} require accurate process models including precise dead time estimation. Model mismatch, particularly in dead time, can lead to poor performance or instability, limiting the practical applicability of these methods in industrial environments where process parameters drift over time and exact models are rarely available.
+
+These industrial realities motivate the search for self-improving controllers that can be deployed without process models, require minimal commissioning effort, maintain acceptable performance during the learning phase, and exhibit robustness to parameter uncertainty including dead time estimation errors.
+
+
+\subsection{Q-Learning for Process Control}
+\label{subsec:q_learning_background}
+
+Reinforcement learning (RL), and Q-learning in particular, offers a promising framework for developing controllers that improve autonomously through interaction with the process~\cite{sutton2018,watkins1989}. Unlike supervised learning approaches that require labeled training data, or model-based control methods that require process identification, Q-learning discovers optimal control policies through trial-and-error interaction guided by a scalar reward signal. The fundamental concept involves learning a Q-function $Q(s,a)$ that estimates the expected cumulative discounted reward for taking action $a$ in state $s$ and following an optimal policy thereafter.
+
+Recent years have witnessed growing interest in applying Q-learning to process control problems. Applications include pH neutralization~\cite{hoskins1992}, batch reactor control~\cite{lee2004}, temperature regulation~\cite{syafiie2008}, and multi-input multi-output systems~\cite{ruan2019}. However, most existing Q-learning controllers share common limitations that hinder industrial deployment: (1) they typically require extensive offline training in simulation before deployment, (2) initial performance can be poor until sufficient learning occurs, (3) exploration during learning can disturb normal process operation, and (4) dead time compensation has received limited attention in the Q-learning literature.
+
+A critical requirement for industrial acceptance is \emph{bumpless switching}---the controller must exhibit predictable, acceptable performance from the moment of deployment. In our previous work, we addressed this challenge by initializing the Q-learning controller from existing PI tunings~\cite{musial2022,musial2024}. Specifically, we developed a two-dimensional Q-learning approach (Q2d) that merges error and error derivative into a single state variable based on first-order closed-loop trajectory requirements: $s = \dot{e} + (1/T_e) \cdot e$, where $T_e$ is the desired closed-loop time constant and $e = Y_{sp} - Y$ is the control error. By initializing the Q-matrix as an identity matrix and setting the controller gain $K_Q = K_P$, the Q2d controller starts with predictable performance and gradually improves through online learning.
+
+The Q2d approach offers significant advantages over the earlier three-dimensional formulation (Q3d)~\cite{stebel2020}: the Q-matrix size reduces from $N^3$ to $N^2$ elements, learning acceleration improves by approximately threefold, and convergence becomes more consistent. Validation on second-order processes and experimental verification on an asynchronous motor demonstrated successful bumpless initialization and gradual performance improvement without offline training~\cite{musial2024}.
+
+
+\subsection{Research Gap and Contributions}
+\label{subsec:research_gap}
+
+Despite the progress achieved with the Q2d approach, two important challenges remain unresolved for industrial deployment when the desired closed-loop time constant $T_e$ differs from the baseline integral time $T_I$:
+
+\noindent\textbf{Challenge 1: Initialization with Time Constant Mismatch.} The Q2d approach achieves bumpless switching when initialized with $T_e = T_I$, matching the existing PI integral time. However, in many industrial scenarios, operators desire faster closed-loop response than the existing PI tuning provides (e.g., $T_e = 10$~s vs. $T_I = 20$~s). Direct initialization with $T_e \neq T_I$ breaks the equivalence between PI and Q2d control laws, potentially causing performance degradation at deployment. A mechanism is needed to enable bumpless initialization even when $T_e$ and $T_I$ differ.
+
+\noindent\textbf{Challenge 2: Dead Time Compensation.} Standard Q-learning assumes that action consequences are observable in the next time step, which fails when significant dead time exists between control action and measured output. The credit assignment problem---determining which past action caused the currently observed state---becomes critical for learning convergence. When the dead time $T_0$ spans multiple sampling intervals, naive application of the Q-learning update rule incorrectly associates current observations with recent actions rather than the actions that actually caused those observations. Existing Q-learning literature provides limited guidance for systematic dead time compensation in continuous control applications.
+
+In this paper, we address both challenges through extensions to the Q2d framework:
+
+\begin{enumerate}
+\item \textbf{Projection Function for Bumpless Initialization:} We derive a compensation term $\Delta U_{\text{proj}} = -e \cdot (1/T_e - 1/T_I)$ that enables bumpless switching even when $T_e \neq T_I$. The projection function compensates for the structural difference between the PI control law (based on $T_I$) and the desired Q2d trajectory (based on $T_e$), allowing initialization with the Q-matrix as an identity matrix and $K_Q = K_P$ regardless of the $T_e$--$T_I$ mismatch. This eliminates the restriction $T_e = T_I$ at deployment while maintaining predictable initial performance.
+
+\item \textbf{Delayed Credit Assignment for Dead Time:} We introduce decoupled dead time parameters---$T_0$ representing the physical plant delay and $T_{0,\text{controller}}$ representing the compensation strategy. State-action pairs are buffered in FIFO structures with size $T_{0,\text{controller}}/T_s$, deferring Q-value updates until action consequences become observable. This enables systematic study of matched compensation ($T_{0,\text{controller}} = T_0$), undercompensation ($T_{0,\text{controller}} < T_0$), and no compensation ($T_{0,\text{controller}} = 0$).
+
+\item \textbf{Robustness Validation:} We demonstrate that the method exhibits graceful degradation---even 50\% undercompensation ($T_{0,\text{controller}} = T_0/2$) provides substantially better convergence than no compensation. This robustness to partial dead time knowledge is particularly valuable in industrial practice where exact dead time estimates are difficult to obtain.
+\end{enumerate}
+
+The proposed extensions maintain the core advantages of Q2d: model-free operation, bumpless switching, and online learning without performance degradation. We validate the approach on first- and second-order inertia processes with dead times up to 4 seconds, demonstrating that dead time compensation with even partial knowledge significantly improves learning convergence compared to operation without compensation.
+
+The remainder of this paper is organized as follows. Section~\ref{sec:problem_statement} provides background on Q-learning and formulates the control objective based on first-order trajectory requirements. Section~\ref{sec:q2d_projection} details the Q2d controller with projection function, including state/action generation and the complete control algorithm. Section~\ref{sec:deadtime_compensation} presents the delayed credit assignment mechanism for dead time compensation. Section~\ref{sec:validation} provides validation results on two plant models with multiple dead time scenarios. Section~\ref{sec:discussion} discusses practical considerations and limitations. Section~\ref{sec:conclusions} concludes with directions for future work.

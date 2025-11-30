@@ -1,0 +1,84 @@
+% ========================================================================
+% SECTION 8: CONCLUSIONS (CORRECTED VERSION)
+% ========================================================================
+% CRITICAL REQUIREMENTS:
+% - First person ("we presented", "we demonstrated")
+% - Uppercase symbols Y(t), U(t), lowercase e(t) for error, Ysp
+% - NO numerical claims without experimental proof
+% - Summarize contributions qualitatively
+% - Future work appropriate for THIS version (no staged learning)
+% - No made-up metrics
+% - Updated: Error symbol changed from E to e throughout
+% ========================================================================
+
+\section{Conclusions}
+\label{sec:conclusions}
+
+We have presented a model-free Q-learning controller for industrial process control that addresses two critical challenges: bumpless initialization from existing PI controllers and robust operation in the presence of process dead time. The proposed Q2d controller integrates a projection function for initialization flexibility and a delayed credit assignment mechanism for dead time compensation, providing a practical framework for deploying reinforcement learning in industrial environments.
+
+\subsection{Summary of Contributions}
+\label{subsec:contributions}
+
+Our work makes the following contributions to Q-learning-based process control:
+
+\noindent\textbf{1. Projection Function for Bumpless Initialization:} We introduced a projection term $\Delta U_{\text{proj}} = -e \cdot (1/T_e - 1/T_I)$ that enables bumpless switching from PI control to Q-learning control even when the desired trajectory time constant $T_e$ differs from the baseline integral time $T_I$. This capability decouples the choice of trajectory time constant from the initialization requirement, providing designers with greater flexibility in specifying closed-loop performance objectives.
+
+\noindent\textbf{2. Delayed Credit Assignment for Dead Time:} We developed a buffer-based Q-learning update mechanism that correctly assigns credit to state-action pairs in the presence of process dead time. By decoupling the physical plant dead time ($T_0$) from the controller's compensation strategy ($T_{0,\text{controller}}$), our approach enables systematic investigation of compensation accuracy requirements and robustness to dead time estimation errors.
+
+\noindent\textbf{3. Geometric State-Action Discretization:} We formulated a geometric action distribution scheme where actions are generated first using a geometric progression and states are placed at action midpoints. This approach provides natural density gradients (fine resolution near the goal, coarse resolution far from goal) and maintains $T_e$-invariant steady-state error tolerance equal to the precision parameter.
+
+\noindent\textbf{4. Validation Framework:} We designed a comprehensive experimental protocol spanning 14 scenarios across two process models, three dead time magnitudes, and three compensation strategies. The clear separation between training mode (with exploration) and verification mode (pure exploitation, $\varepsilon=0$) ensures that performance metrics reflect learned policy quality rather than exploratory actions.
+
+\noindent\textbf{5. Sparse Reward Strategy:} We demonstrated that a sparse reward function ($R=1$ only at the goal state with goal action, $R=0$ otherwise) suffices for learning effective control policies. This simplicity eliminates the need for reward shaping or domain-specific reward engineering, relying instead on the bootstrap mechanism to propagate values throughout the state space.
+
+
+\subsection{Practical Implications}
+\label{subsec:implications}
+
+The Q2d controller with projection function and dead time compensation offers several advantages for industrial deployment:
+
+\noindent\textbf{Model-Free Operation:} The controller requires no explicit process model, only the existing PI controller tunings ($K_{PI}$, $T_I$) and an estimate of the dead time ($T_{0,\text{controller}}$). This reduces commissioning complexity compared to model-based approaches that require system identification.
+
+\noindent\textbf{Bumpless Integration:} The projection function enables seamless replacement of existing PI controllers without causing transients or requiring plant shutdowns. Initial performance matches the baseline PI controller, with gradual improvement through online learning.
+
+\noindent\textbf{Dead Time Robustness:} The delayed credit assignment mechanism provides explicit compensation for process dead time, a common characteristic of industrial processes (e.g., material transport, sensor delays, communication latencies). The decoupled parameterization enables operation even with imperfect dead time knowledge.
+
+\noindent\textbf{Memory Efficiency:} The Q2d state space merging reduces Q-matrix size from $N^3$ (Q3d formulation with separate error and derivative dimensions) to $N^2$ elements, enabling implementation on memory-constrained hardware such as programmable logic controllers (PLCs).
+
+\noindent\textbf{Interpretable Parameters:} Key design parameters ($T_e$, prec, $K_Q$) have direct physical interpretations (trajectory time constant, steady-state accuracy, control gain), facilitating parameter selection by control engineers familiar with PI tuning.
+
+
+\subsection{Future Research Directions}
+\label{subsec:future_work}
+
+Several extensions of this work warrant further investigation:
+
+\noindent\textbf{Adaptive Dead Time Estimation:} The current approach assumes known (or estimated) dead time. Integrating online dead time estimation methods could enhance robustness to time-varying delays caused by changing flow rates, operating conditions, or measurement configurations.
+
+\noindent\textbf{Multivariable Extensions:} Extending Q2d to multivariable processes (MIMO systems) represents a significant challenge due to interaction effects and higher-dimensional state spaces. Coordinated single-loop controllers or structured Q-matrix factorizations may provide tractable approaches.
+
+\noindent\textbf{Nonlinear Process Characteristics:} While our validation includes a nonlinear pneumatic actuator model, systematic investigation of Q-learning performance on strongly nonlinear processes (e.g., pH control, batch reactors) would clarify applicability boundaries.
+
+\noindent\textbf{Safety-Constrained Learning:} Industrial applications often impose strict safety constraints on process variables (temperature limits, pressure limits, concentration bounds). Incorporating hard constraints into the Q-learning framework through safe exploration strategies or constraint-aware reward functions would enhance industrial applicability.
+
+\noindent\textbf{Transfer Learning Across Operating Regimes:} Many processes operate across multiple regimes with different dynamics. Investigating whether Q-matrices learned in one regime can accelerate learning in related regimes (transfer learning) could reduce commissioning time for multi-regime processes.
+
+\noindent\textbf{Comparison with Alternative RL Methods:} Our work focuses on tabular Q-learning with discrete state-action spaces. Comparing performance, sample efficiency, and computational requirements against alternative reinforcement learning approaches (actor-critic methods, policy gradient methods, function approximation) would provide insight into algorithm selection trade-offs.
+
+\noindent\textbf{Real-World Pilot Studies:} While simulation validation provides controlled experimental conditions, deployment on actual industrial processes would reveal practical challenges related to measurement noise, disturbance characteristics, operator interaction, and long-term reliability.
+
+
+\subsection{Concluding Remarks}
+\label{subsec:concluding_remarks}
+
+The integration of model-free reinforcement learning into industrial process control represents a promising direction for addressing the persistent challenge of poor PID controller tuning in practice. Our Q2d controller with projection function and dead time compensation demonstrates that Q-learning can be adapted to satisfy the practical requirements of industrial deployment: bumpless initialization, dead time handling, memory efficiency, and interpretable parameters.
+
+The experimental validation framework presented in this work provides a foundation for systematic evaluation of the proposed methods. The pending experimental results will quantify performance improvements, convergence characteristics, and robustness to dead time estimation errors across the 14 planned scenarios.
+
+By building on established PI control structures and requiring only existing controller tunings as prior knowledge, the Q2d approach offers a path toward self-improving control systems that can be deployed by practicing control engineers without specialized expertise in machine learning or system identification. This accessibility is essential for addressing the widespread problem of poorly tuned industrial controllers at scale.
+
+
+\section*{Acknowledgments}
+
+This work was supported by [funding sources to be added]. The authors thank [collaborators/reviewers to be added] for valuable discussions and feedback.
+

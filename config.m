@@ -55,7 +55,7 @@ nr_modelu = 3;                     % Model selection (1, 3, 5, 6, 7, 8)
 k = 1;                             % Process gain
 % T = [2.34 1.55 9.38];              % Time constants [s] - adjust dimensions per model
 T=[5 2];
-T0 = 3;                            % Plant dead time (physical reality) [s]
+T0 = 2;                            % Plant dead time (physical reality) [s]
 T0_controller = T0;                % Controller compensation dead time [s] (0=no compensation)
 SP_ini = 50;                       % Initial setpoint [%]
 

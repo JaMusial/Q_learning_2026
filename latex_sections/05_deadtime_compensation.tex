@@ -1,0 +1,229 @@
+% ========================================================================
+% SECTION 4: DEAD TIME COMPENSATION
+% ========================================================================
+% Structure: 4 subsections (1.8 pages total)
+% Novel contribution: delayed credit assignment mechanism
+% ========================================================================
+
+\section{Dead Time Compensation via Delayed Credit Assignment}
+\label{sec:deadtime_compensation}
+
+\subsection{Decoupled Dead Time Parameters}
+\label{subsec:decoupled_parameters}
+
+Industrial processes often exhibit dead time that may be imperfectly known, time-varying, or difficult to measure precisely. To enable systematic investigation of dead time compensation strategies and robustness to estimation errors, we introduce two independent dead time parameters:
+
+\begin{itemize}
+\item \textbf{$T_0$ (Plant Dead Time):} The physical dead time in the actual process, representing reality. The control signal $u(t)$ affects the measured process output at time $t + T_0$. This parameter is inherent to the process and cannot be changed by the controller.
+
+\item \textbf{$T_{0,\text{controller}}$ (Controller Compensation Dead Time):} The dead time value used by the controller for credit assignment. This represents the controller's assumption or estimate of the dead time, which may differ from the true value $T_0$.
+\end{itemize}
+
+This decoupling enables investigation of several practically relevant scenarios:
+
+\noindent\textbf{Matched Compensation} ($T_{0,\text{controller}} = T_0$): The controller has perfect knowledge of the dead time and compensates optimally.
+
+\noindent\textbf{No Compensation} ($T_{0,\text{controller}} = 0$): The controller ignores dead time entirely, relying on implicit learning to handle the delay. This represents the naive Q-learning approach.
+
+\noindent\textbf{Undercompensation} ($T_{0,\text{controller}} < T_0$): The controller underestimates the dead time, crediting actions too early. This tests robustness to incomplete information.
+
+\noindent\textbf{Overcompensation} ($T_{0,\text{controller}} > T_0$): The controller overestimates the dead time, crediting actions too late. This tests robustness to overly conservative estimates.
+
+The ability to independently vary these parameters provides insight into the method's robustness---a critical consideration for industrial deployment where exact dead time knowledge is rarely available and may drift over time due to process changes, varying operating conditions, or equipment aging.
+
+
+\subsection{Delayed Credit Assignment Algorithm}
+\label{subsec:delayed_credit_assignment}
+
+The core challenge in Q-learning with dead time is ensuring that Q-value updates credit the correct state-action pairs. When dead time spans multiple sampling intervals, the effect of action $a(t)$ taken at time $t$ becomes observable only at time $t + T_0$, not at the next sampling instant $t + \Delta t$.
+
+\subsubsection{Standard Q-Learning Failure}
+
+Standard Q-learning (Section~\ref{subsec:q_learning_basics}) assumes single-step transitions:
+%
+\begin{equation}
+Q(s_t, a_t) \leftarrow Q(s_t, a_t) + \alpha\left[R_t + \gamma \max_{a'} Q(s_{t+1}, a') - Q(s_t, a_t)\right]
+\label{eq:standard_q_update_timestep}
+\end{equation}
+%
+where $s_t$ is the state at time $t$, $a_t$ is the action taken, and $s_{t+1}$ is the state observed at $t+\Delta t$. This implicitly assumes that $s_{t+1}$ reflects the consequence of $a_t$.
+
+When dead time exists, this assumption breaks. For example, with $T_0 = 4$~s and $\Delta t = 0.1$~s, the plant output at time $t$ reflects the control action applied 40 time steps earlier, not the action $a_t$ just selected. Applying~\eqref{eq:standard_q_update_timestep} would incorrectly associate $s_{t+1}$ with $a_t$, leading to poor or failed learning.
+
+\subsubsection{Buffer-Based Solution}
+
+To resolve this credit assignment problem, we introduce FIFO (first-in-first-out) buffers that store state-action pairs and delay Q-value updates until the consequences become observable. The buffer size is determined by the controller's compensation strategy:
+%
+\begin{equation}
+N_{\text{buffer}} = \left\lfloor \frac{T_{0,\text{controller}}}{\Delta t} \right\rfloor
+\label{eq:buffer_size}
+\end{equation}
+%
+where $\lfloor \cdot \rfloor$ denotes the floor function. For example, with $T_{0,\text{controller}} = 4$~s and $\Delta t = 0.1$~s, the buffer holds $N_{\text{buffer}} = 40$ elements.
+
+Algorithm~\ref{alg:delayed_credit_assignment} presents the complete delayed credit assignment procedure.
+
+\begin{algorithm}[htb]
+\caption{Delayed Credit Assignment for Dead Time Compensation}
+\label{alg:delayed_credit_assignment}
+\begin{algorithmic}[1]
+\REQUIRE Current state $s_t$, selected action $a_t$, learning flag $L_t$
+\REQUIRE State buffer $\mathcal{B}_s$, action buffer $\mathcal{B}_a$, learning buffer $\mathcal{B}_L$
+\REQUIRE $T_{0,\text{controller}}$, $\Delta t$, $i_{\text{goal}}$, $a_{\text{goal}}$
+\ENSURE Updated Q-matrix $Q$, updated buffers
+\STATE
+\IF{$T_{0,\text{controller}} > 0$}
+    \STATE \COMMENT{--- Delayed Credit Assignment Mode ---}
+    \STATE
+    \STATE \COMMENT{Step 1: Buffer current state-action pair}
+    \STATE $(s_{\text{delayed}}, \mathcal{B}_s) \gets \text{BufferPush}(s_t, \mathcal{B}_s)$
+    \STATE $(a_{\text{delayed}}, \mathcal{B}_a) \gets \text{BufferPush}(a_t, \mathcal{B}_a)$
+    \STATE $(L_{\text{delayed}}, \mathcal{B}_L) \gets \text{BufferPush}(L_t, \mathcal{B}_L)$
+    \STATE
+    \STATE \COMMENT{Step 2: Current state is the "next state" for delayed action}
+    \STATE $s_{\text{next}} \gets s_t$ \COMMENT{Observable consequence now}
+    \STATE
+    \STATE \COMMENT{Step 3: Reward assignment}
+    \IF{$s_{\text{delayed}} = i_{\text{goal}}$ \AND $a_{\text{delayed}} = a_{\text{goal}}$}
+        \STATE $R \gets 1$ \COMMENT{Reward for reaching/maintaining goal}
+    \ELSE
+        \STATE $R \gets 0$ \COMMENT{Sparse reward strategy}
+    \ENDIF
+    \STATE
+    \STATE \COMMENT{Step 4: Bootstrap value computation}
+    \IF{$s_{\text{delayed}} = i_{\text{goal}}$ \AND $a_{\text{delayed}} = a_{\text{goal}}$}
+        \STATE $s_{\text{bootstrap}} \gets i_{\text{goal}}$ \COMMENT{Override: goal→goal stays at goal}
+    \ELSE
+        \STATE $s_{\text{bootstrap}} \gets s_{\text{next}}$ \COMMENT{Use actual observed state}
+    \ENDIF
+    \STATE
+    \STATE \COMMENT{Step 5: Q-learning update}
+    \IF{$L_{\text{delayed}} = 1$}
+        \STATE $Q(s_{\text{delayed}}, a_{\text{delayed}}) \gets Q(s_{\text{delayed}}, a_{\text{delayed}})$
+        \STATE \hspace{2em} $+ \alpha \left[R + \gamma \max_{a'} Q(s_{\text{bootstrap}}, a') - Q(s_{\text{delayed}}, a_{\text{delayed}})\right]$
+    \ENDIF
+\ELSE
+    \STATE \COMMENT{--- No Compensation Mode ---}
+    \STATE
+    \STATE \COMMENT{Step 1: Save previous state-action before selecting new}
+    \STATE $s_{\text{prev}} \gets s_{t-1}$ \COMMENT{State from previous iteration}
+    \STATE $a_{\text{prev}} \gets a_{t-1}$ \COMMENT{Action from previous iteration}
+    \STATE $L_{\text{prev}} \gets L_{t-1}$ \COMMENT{Learning flag from previous iteration}
+    \STATE
+    \STATE \COMMENT{Step 2: Current state is next state for previous action}
+    \STATE $s_{\text{next}} \gets s_t$
+    \STATE
+    \STATE \COMMENT{Step 3: Reward based on previous state}
+    \IF{$s_{\text{prev}} = i_{\text{goal}}$ \AND $a_{\text{prev}} = a_{\text{goal}}$}
+        \STATE $R \gets 1$
+    \ELSE
+        \STATE $R \gets 0$
+    \ENDIF
+    \STATE
+    \STATE \COMMENT{Step 4: Q-learning update (one-step TD)}
+    \IF{$L_{\text{prev}} = 1$}
+        \STATE $Q(s_{\text{prev}}, a_{\text{prev}}) \gets Q(s_{\text{prev}}, a_{\text{prev}})$
+        \STATE \hspace{2em} $+ \alpha \left[R + \gamma \max_{a'} Q(s_{\text{next}}, a') - Q(s_{\text{prev}}, a_{\text{prev}})\right]$
+    \ENDIF
+\ENDIF
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Timing Analysis}
+
+To understand why delayed credit assignment works when $T_{0,\text{controller}} = T_0$, consider the timeline of events:
+
+\begin{enumerate}
+\item \textbf{Time $t$:} Controller observes state $s(t)$, selects action $a(t)$, computes control $u(t)$
+\item \textbf{Time $t$ (plant):} Control $u(t)$ enters the plant's dead time buffer of length $T_0/\Delta t$
+\item \textbf{Time $t$ (controller):} State-action pair $(s(t), a(t))$ enters controller's buffer of length $T_{0,\text{controller}}/\Delta t$
+\item \textbf{Time $t + T_0$:} Plant output $y(t+T_0)$ reflects the effect of $u(t)$
+\item \textbf{Time $t + T_0$:} State $s(t+T_0)$ computed from $y(t+T_0)$ reflects consequence of $a(t)$
+\item \textbf{Time $t + T_{0,\text{controller}}$:} Controller buffer pops $(s(t), a(t))$ for Q-value update
+\item \textbf{When $T_{0,\text{controller}} = T_0$:} The update at time $t + T_0$ pairs $a(t)$ with $s(t+T_0)$ ✓
+\end{enumerate}
+
+This synchronization ensures correct credit assignment: the action $a(t)$ is updated based on the state $s(t+T_0)$ that actually reflects its consequence.
+
+\subsubsection{Buffer Pre-filling}
+
+During the manual control phase (first 5--10 samples), both plant and controller buffers are pre-filled with appropriate values:
+\begin{itemize}
+\item Plant buffers: Filled with $u = y_{\text{sp}}/k$ (steady-state control)
+\item Controller buffers: Filled with goal state and goal action
+\end{itemize}
+This initialization prevents transients caused by zero-filled buffers and simulates a system already operating near steady state before Q-learning begins.
+
+
+\subsection{Sparse Reward Strategy}
+\label{subsec:sparse_reward}
+
+The choice of reward function significantly influences Q-learning convergence and the resulting policy. We employ a sparse reward strategy that provides positive reward only at the goal state:
+%
+\begin{equation}
+R(s,a) = \begin{cases}
+1 & \text{if } s = s_{\text{goal}} \text{ and } a = a_{\text{goal}} \\
+0 & \text{otherwise}
+\end{cases}
+\label{eq:sparse_reward}
+\end{equation}
+%
+where $s_{\text{goal}}$ is the discrete state closest to $s = 0$ and $a_{\text{goal}}$ is the zero control increment action.
+
+\subsubsection{Rationale}
+
+This sparse reward design ensures that:
+
+\noindent\textbf{1. Direct Reward at Goal:} The state-action pair $(s_{\text{goal}}, a_{\text{goal}})$ receives immediate positive feedback. Over many learning iterations, this drives $Q(s_{\text{goal}}, a_{\text{goal}})$ toward high values.
+
+\noindent\textbf{2. Bootstrapped Learning Elsewhere:} All other Q-values are learned through the bootstrap term $\gamma \max_{a'} Q(s', a')$ in~\eqref{eq:q_learning_update}. States that frequently transition to states with high Q-values will themselves acquire high Q-values, propagating the goal value backward through the state space.
+
+\noindent\textbf{3. Goal State Preference:} Because only the goal state provides direct reward, the controller learns to drive the system toward $s = 0$ (the target trajectory) rather than lingering in off-trajectory states.
+
+\noindent\textbf{4. Zero Action Enforcement:} By rewarding only when $a = a_{\text{goal}}$ (zero increment), we prevent the controller from selecting non-zero actions in the goal state, which would unnecessarily disturb steady-state operation.
+
+Alternative reward schemes (e.g., $R = -|e|$ penalizing error magnitude) were considered but rejected because they can lead to undesirable behaviors such as premature action selection before reaching the goal state or difficulty distinguishing between trajectory-following and arbitrary error reduction paths.
+
+\subsubsection{Convergence Properties}
+
+Under the sparse reward strategy, the Q-value at the goal state becomes:
+%
+\begin{equation}
+Q(s_{\text{goal}}, a_{\text{goal}}) \to \frac{1}{1 - \gamma}
+\label{eq:goal_q_value_limit}
+\end{equation}
+%
+as learning progresses and the goal state is visited repeatedly. For $\gamma = 0.99$, the theoretical limit is $Q(s_{\text{goal}}, a_{\text{goal}}) = 100$. In practice, convergence to values near 95--98 is typical after sufficient learning epochs.
+
+States farther from the goal acquire lower Q-values based on the expected cumulative discounted reward for following an optimal trajectory toward the goal. This creates a gradient in the Q-matrix that guides the controller toward the target trajectory.
+
+
+\subsection{Continuous Learning Mode}
+\label{subsec:continuous_learning}
+
+An important design decision concerns buffer management between learning episodes. In our implementation, \emph{episodes} are artificial boundaries used for convergence monitoring and performance evaluation---they do not represent system resets or reinitialization in a physical sense.
+
+\subsubsection{Buffer Persistence}
+
+Buffers are \textbf{not} reset between episodes:
+\begin{itemize}
+\item State buffer $\mathcal{B}_s$ retains values across episode boundaries
+\item Action buffer $\mathcal{B}_a$ retains values across episode boundaries
+\item Learning flag buffer $\mathcal{B}_L$ retains values across episode boundaries
+\end{itemize}
+
+This design choice reflects industrial reality: a controller deployed in a plant operates continuously, not in discrete episodes. Process disturbances occur at random times, and the controller must handle them regardless of when the previous disturbance ended. Episode boundaries are merely computational constructs for evaluating whether the controller has successfully rejected a disturbance and returned to steady state.
+
+\subsubsection{Episode Termination Criteria}
+
+An episode terminates when one of two conditions is met:
+
+\noindent\textbf{Stabilization:} The system reaches and maintains the goal state ($s = s_{\text{goal}}$) for a specified number of consecutive samples (e.g., 20 samples). This indicates successful disturbance rejection.
+
+\noindent\textbf{Maximum Duration:} The episode reaches a maximum iteration count (e.g., 4000 samples) without stabilizing. This timeout prevents indefinite episodes during early learning when the controller may not yet reliably reach the goal.
+
+After episode termination, performance metrics (IAE, settling time, overshoot) are computed for that episode, a new disturbance or setpoint change is applied, and learning continues without buffer reset.
+
+\subsubsection{Verification Experiments}
+
+The only exception to continuous learning occurs during verification experiments conducted before and after training. For these controlled tests, buffers are explicitly reset to initial conditions to ensure fair comparison between PI baseline, Q-controller before learning, and Q-controller after learning. This reset provides a clean starting point for quantitative performance evaluation.
