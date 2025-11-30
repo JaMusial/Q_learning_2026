@@ -10,7 +10,10 @@
       "Bash(git revert:*)",
       "Bash(git rm:*)",
       "Bash(matlab -batch:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(mkdir:*)",
+      "Bash(git fsck:*)",
+      "Bash(git fetch:*)"
     ],
     "deny": [],
     "ask": []

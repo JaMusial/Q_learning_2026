@@ -239,6 +239,10 @@ wart_akcji_bez_f_rzutujacej = wart_akcji;
 if f_rzutujaca_on == 1 && (stan ~= nr_stanu_doc && stan ~= nr_stanu_doc+1 && ...
         stan ~= nr_stanu_doc-1 && abs(e) >= dokladnosc_gen_stanu)
     funkcja_rzutujaca = (e * (1/Te - 1/Ti));
+    % NOTE 2025-01-28: SUBTRACTION is mathematically correct (Paper Eq. 7)
+    % Required for initialization to match PI controller behavior
+    % However, large projection magnitude (e·0.45 for Te=2, Ti=20) can corrupt Q-learning
+    % See PROJECTION_LEARNING_PROBLEM.md for detailed analysis
     wart_akcji = wart_akcji - funkcja_rzutujaca;
 else
     funkcja_rzutujaca = 0;

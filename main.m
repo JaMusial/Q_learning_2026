@@ -11,7 +11,17 @@ format long
 
 m_inicjalizacja
 m_inicjalizacja_buforow
-Te = Ti;
+
+% Te initialization depends on projection function mode
+if f_rzutujaca_on == 1
+    % Paper version: Start at goal Te (projection term will be non-zero)
+    Te = Te_bazowe;
+    fprintf('INFO: Projection function enabled - Te initialized to Te_bazowe = %g (no staged learning)\n', Te_bazowe);
+else
+    % Current version: Start at Ti for bumpless switching, then staged reduction
+    Te = Ti;
+    fprintf('INFO: Projection function disabled - Te initialized to Ti = %g (staged learning enabled)\n', Ti);
+end
 
 % Generate state and action spaces
 [stany, akcje_sr, ilosc_stanow, ile_akcji, nr_stanu_doc, nr_akcji_doc] = ...
@@ -29,6 +39,7 @@ if poj_iteracja_uczenia == 1
 else
     % Run initial verification to establish baseline (logi_before_learning)
     m_eksperyment_weryfikacyjny
+
     % Note: Plots generated only at the end for final comparison
     m_reset
 end
@@ -53,7 +64,10 @@ while epoka <= max_epoki
     %   - mean(b_mnk_mean) in [b_min, b_max]: Stable (not accelerating)
     %   - flaga_zmiana_Te == 1: Window processing completed
     %   - Te > Te_bazowe: Haven't reached goal time constant
-    if mean(a_mnk_mean) > te_reduction_threshold_a && ...
+    %   - f_rzutujaca_on == 0: Staged learning 
+    % only when projection disabled
+    if f_rzutujaca_on == 0 && ...
+            mean(a_mnk_mean) > te_reduction_threshold_a && ...
             mean(b_mnk_mean) > te_reduction_threshold_b_min && ...
             mean(b_mnk_mean) < te_reduction_threshold_b_max && ...
             flaga_zmiana_Te == 1 && epoka ~= 0 && Te > Te_bazowe

@@ -9,7 +9,7 @@
 
 %% --- Simulation Control ---
 poj_iteracja_uczenia = 0;          % 1=single iteration mode, 0=full verification with metrics
-max_epoki = 1500;                    % Training duration (500 for testing, 5000+ for full training)
+max_epoki = 2500;                    % Training duration (500 for testing, 5000+ for full training)
 maksymalna_ilosc_iteracji_uczenia = 4000;  % Max samples per epoch
 czas_eksp_wer = 600;               % Verification experiment time [s]
 gif_on = 0;                        % 1=generate GIF animation, 0=disabled
@@ -55,8 +55,8 @@ nr_modelu = 3;                     % Model selection (1, 3, 5, 6, 7, 8)
 k = 1;                             % Process gain
 % T = [2.34 1.55 9.38];              % Time constants [s] - adjust dimensions per model
 T=[5 2];
-T0 = 4;                            % Plant dead time (physical reality) [s]
-T0_controller = 0;                % Controller compensation dead time [s] (0=no compensation)
+T0 = 3;                            % Plant dead time (physical reality) [s]
+T0_controller = T0;                % Controller compensation dead time [s] (0=no compensation)
 SP_ini = 50;                       % Initial setpoint [%]
 
 %% --- PI Controller Parameters ---
@@ -80,14 +80,22 @@ nagroda = 1;                       % Reward value (typically 1)
 % State space generation
 dokladnosc_gen_stanu = 0.5;        % Precision (steady-state accuracy)
 oczekiwana_ilosc_stanow = 100;     % Expected number of states
-f_rzutujaca_on = 0;                % Projection function: 1=enabled, 0=disabled
+f_rzutujaca_on = 1;                % Projection function mode:
+                                   %   0 = DISABLED (current approach, recommended)
+                                   %       - Te starts at Ti (bumpless switching)
+                                   %       - Staged learning enabled (Te: 20→2 in 0.1s steps)
+                                   %       - Better empirical performance
+                                   %   1 = ENABLED (paper version, for comparison)
+                                   %       - Te starts at Te_bazowe (immediate goal)
+                                   %       - Staged learning DISABLED (Te stays constant)
+                                   %       - Projection term: e·(1/Te - 1/Ti) applied to control
 
 % Control constraints
 ograniczenie_sterowania_dol = 0;   % Lower limit [%]
 ograniczenie_sterowania_gora = 100;% Upper limit [%]
 
 % Exploration
-RD = 5;                            % Random deviation range
+RD = 3;                            % Random deviation range
 max_powtorzen_losowania = 10;      % Max randomization attempts
 max_powtorzen_losowania_RD = 10;   % Max RD randomization attempts
 

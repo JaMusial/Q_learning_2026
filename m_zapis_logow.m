@@ -119,7 +119,7 @@ if zapis_logi==1
     logi.Q_u_increment_bez_f_rzutujacej(logi_idx) = u_increment_bez_f_rzutujacej;
     logi.Q_t(logi_idx) = t;
     logi.Q_d(logi_idx) = d;
-    logi.Q_SP(logi_idx) = f_skalowanie(wart_max_y, wart_min_y, proc_max_y, proc_min_y, SP);
+    logi.Q_SP(logi_idx) = SP;  % FIXED 2025-01-28: SP is already in process units, no scaling needed
     logi.Q_czas_zaklocenia(logi_idx) = maksymalna_ilosc_iteracji_uczenia;
     logi.Q_maxS(logi_idx) = maxS;
     logi.Q_table_update(logi_idx) = Q_update;

@@ -38,10 +38,11 @@ Guidance for Claude Code when working with this Q2d Q-learning controller reposi
 
 **Run**: `main.m` in MATLAB
 
-**Configure** (`m_inicjalizacja.m`):
+**Configure** (`config.m`):
 - `poj_iteracja_uczenia`: 1=single iteration mode, 0=full verification with metrics
 - `max_epoki`: Training duration (500 for testing, 5000+ for full training)
 - `nr_modelu`: Plant model 1-8 (1=1st order, 3=2nd order, 8=3rd order pneumatic)
+- `f_rzutujaca_on`: 0=current approach (recommended), 1=paper version with projection (for comparison)
 
 **Performance**: ~30-35 seconds per 100 epochs.
 
@@ -61,10 +62,20 @@ Guidance for Claude Code when working with this Q2d Q-learning controller reposi
 5. **Simulate**: Plant at 0.01s timestep
 
 **Key Features**:
-- Projection function: `e·(1/Te - 1/Ti)` for stability (optional)
+- Projection function: `e·(1/Te - 1/Ti)` (optional, see below)
 - Dead time: Decoupled plant delay (T0) and controller compensation (T0_controller)
 - Reference trajectory: Uses Te_bazowe (goal) for consistent visualization
 - Learning disabled when control saturates
+
+**Projection Function** (2025-01-28 clarification):
+- **Current approach** (`f_rzutujaca_on=0`, **recommended**): Disabled, uses staged learning instead
+  - Te starts at Ti (bumpless switching), reduces gradually to Te_bazowe
+  - Better empirical performance, smoother convergence
+- **Paper version** (`f_rzutujaca_on=1`, for comparison): Enabled with fixed Te
+  - Te = Te_bazowe from start (immediate goal, large initial transient)
+  - Projection term applied: `wart_akcji -= e·(1/Te - 1/Ti)`
+  - As described in 2022 paper Eq. 6-7 (but implemented differently - see PROJECTION_ANALYSIS.md)
+- See `PROJECTION_COMPARISON_GUIDE.md` for experimental comparison protocol
 
 ## Dead Time Compensation
 
