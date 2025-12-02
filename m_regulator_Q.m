@@ -55,10 +55,15 @@ if iter <= ilosc_probek_sterowanie_reczne
         [~, bufor_state] = f_bufor(stan, bufor_state);
         [~, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);
         [~, bufor_uczenie] = f_bufor(uczenie, bufor_uczenie);
+        [~, bufor_e] = f_bufor(e, bufor_e);  % Buffer error (not used currently but kept for consistency)
     end
 
     stan_value_ref = de_ref + 1/Te * e_ref;
     stan_nr_ref = f_find_state(stan_value_ref, stany);
+
+    % Initialize variables for projection function (no buffering during manual control)
+    e_T0 = e;
+    old_stan_T0 = stan;
 
     t = t + dt;
 
@@ -167,10 +172,11 @@ else
     % NOW buffer the correctly matched (stan, wyb_akcja) pair
 
     if T0_controller > 0
-        % Buffer current state and action for delayed credit assignment
+        % Buffer current state, action for delayed credit assignment
         [old_stan_T0, bufor_state] = f_bufor(stan, bufor_state);
         [wyb_akcja_T0, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);
         [uczenie_T0, bufor_uczenie] = f_bufor(uczenie, bufor_uczenie);
+        [e_T0, bufor_e] = f_bufor(e, bufor_e);  % Buffer error (not used but kept for consistency)
 
         % Use CURRENT state as next state (effect is visible now)
         stan_T0 = stan;
@@ -207,6 +213,7 @@ else
         wyb_akcja_T0 = old_wyb_akcja;  % Action from SAME iteration as old_state
         uczenie_T0 = old_uczenie;      % Learning flag from SAME iteration as old_state
         R_buffered = old_R;            % Reward from SAME iteration as old_state (CRITICAL FIX!)
+        e_T0 = e;                      % No buffering for error (use current)
     end
 
     stan_value_ref = de_ref + 1/Te * e_ref;
@@ -236,13 +243,13 @@ end
 wart_akcji_bez_f_rzutujacej = wart_akcji;
 
 % Apply projection function if enabled
+% NOTE 2025-12-01: Projection ALWAYS uses CURRENT error/state (not buffered)
+% Rationale: Projection modifies the control signal applied to plant RIGHT NOW
 if f_rzutujaca_on == 1 && (stan ~= nr_stanu_doc && stan ~= nr_stanu_doc+1 && ...
         stan ~= nr_stanu_doc-1 && abs(e) >= dokladnosc_gen_stanu)
     funkcja_rzutujaca = (e * (1/Te - 1/Ti));
     % NOTE 2025-01-28: SUBTRACTION is mathematically correct (Paper Eq. 7)
     % Required for initialization to match PI controller behavior
-    % However, large projection magnitude (e·0.45 for Te=2, Ti=20) can corrupt Q-learning
-    % See PROJECTION_LEARNING_PROBLEM.md for detailed analysis
     wart_akcji = wart_akcji - funkcja_rzutujaca;
 else
     funkcja_rzutujaca = 0;

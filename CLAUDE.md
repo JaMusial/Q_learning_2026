@@ -503,6 +503,35 @@ end
 ```
 **Impact**: Goal→Goal transitions: 100% (was 74.3%), Q(goal,goal) increases
 
+### Bug #6: Same-Side Constraint Disabled in Projection Mode (2025-12-02)
+**File**: m_losowanie_nowe.m
+**Problem**: Lines 61-62 were commented out, disabling same-side matching constraint for f_rzutujaca_on=1
+- Controller selected actions > 50 in states < 50 (wrong control direction)
+- 9,007 constraint violations in 90k samples (10% violation rate)
+- 2,949 violations during exploration (constraint should prevent)
+- 6,058 violations during exploitation (Q-table corrupted by wrong explorations)
+- **Result**: Controller stuck oscillating between states 45-47 with actions 47-51
+**Fix**: Uncommented lines 61-62 to re-enable same-side matching (m_losowanie_nowe.m:60-62)
+```matlab
+if wyb_akcja3 ~= wyb_akcja && wyb_akcja3 ~= nr_akcji_doc && ...
+       ((wyb_akcja3 > nr_akcji_doc && stan > nr_stanu_doc) || ...
+        (wyb_akcja3 < nr_akcji_doc && stan < nr_stanu_doc))
+```
+**Impact**: Eliminates constraint violations, prevents oscillation around goal action
+
+### Bug #7: Projection Threshold Disables Q-Learning (2025-12-02)
+**File**: m_regulator_Q.m
+**Problem**: Lines 257-270 disabled Q-learning when `abs(funkcja_rzutujaca) > 0.05`
+- With Te=10, Ti=20: projection coefficient = 0.05
+- Q-learning disabled when `abs(e) > 1%` (99% of training time)
+- Controller operated almost entirely on projection term
+- Minimal Q-learning refinement (only near setpoint)
+**Fix**: Removed threshold check (m_regulator_Q.m:257-270 deleted)
+**Impact**: Q-learning now active at all error levels
+**Caveat**: Credit assignment mismatch remains with projection + dead time (see PROJECTION_FUNCTION.md)
+- May cause Q-table corruption with large projection coefficients
+- Recommend f_rzutujaca_on=0 (staged learning) for production use
+
 ### Results After Fixes
 **T0=0, 50 epochs**:
 - Q(50,50): 92.46 (converging to 100) ✓

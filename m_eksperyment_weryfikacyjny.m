@@ -94,6 +94,7 @@ if T0_controller ~= 0
     bufor_state = zeros(1, round(T0_controller/dt));
     bufor_wyb_akcja = zeros(1, round(T0_controller/dt));
     bufor_uczenie = zeros(1, round(T0_controller/dt));
+    bufor_e = zeros(1, round(T0_controller/dt));  % Error buffer for projection temporal consistency
 end
 
 %% =====================================================================
