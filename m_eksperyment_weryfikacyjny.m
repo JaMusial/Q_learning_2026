@@ -122,7 +122,7 @@ for iter_test=1:dlugosc_symulacji
 
     % Apply disturbance during Phase 2 (middle third of experiment)
     if t > phase2_start_time && t <= phase2_end_time
-        d = 0.3;  % Phase 2: disturbance on
+        d = - 0.3;  % Phase 2: disturbance on
     else
         d = 0;    % Phase 1 or Phase 3: no disturbance
     end
@@ -145,6 +145,9 @@ if pierwszy_wykres_weryfikacyjny==0 && licz_wskazniki==0
     % First run (Q without learning) - store data
     logi_before_learning = logi;
     pierwszy_wykres_weryfikacyjny=1;
+
+    % Export debug data to JSON if debug logging enabled
+    f_export_debug_json(logi_before_learning, 'logi_before_learning.json', debug_logging);
 end
 
 % Plotting is now handled in m_rysuj_wykresy.m

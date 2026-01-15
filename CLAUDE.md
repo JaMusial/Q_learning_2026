@@ -67,19 +67,25 @@ Guidance for Claude Code when working with this Q2d Q-learning controller reposi
 - Reference trajectory: Uses Te_bazowe (goal) for consistent visualization
 - Learning disabled when control saturates
 
-**Projection Function** (2025-01-28 experimental validation):
-- **Current approach** (`f_rzutujaca_on=0`, **RECOMMENDED**): Projection disabled, uses staged learning instead
-  - Te starts at Ti (bumpless switching), reduces gradually to Te_bazowe in 0.1s steps
-  - Better empirical performance, smoother convergence
-  - **Proven to work correctly**
-- **Paper version** (`f_rzutujaca_on=1`, **DO NOT USE**): Projection enabled with fixed Te
-  - Te = Te_bazowe from start (immediate goal, large 10× Te-Ti mismatch)
-  - Projection term: `wart_akcji -= e·(1/Te - 1/Ti)` applied to control
-  - **EXPERIMENTAL FAILURE (1000 epochs)**: Output stuck at 44.89% (target: 100%), error 5.11%, limit cycle between 2 states
-  - **Root cause**: Projection magnitude (e·0.45) overwhelms Q-learning, wrong control direction for large errors
-  - **Conclusion**: Projection function fundamentally flawed for large Te-Ti mismatches
+**Projection Function** (2026-01-15 fix applied):
+- **Staged learning** (`f_rzutujaca_on=0`): Projection disabled, Te starts at Ti and reduces gradually
+  - Te: Ti (20s) → Te_bazowe (2-5s) in 0.1s steps
+  - Better for long-term learning and Q-table refinement
+  - Recommended for production use
+- **Projection mode** (`f_rzutujaca_on=1`): Projection enabled with fixed Te=Te_bazowe
+  - Te = Te_bazowe from start (e.g., 5s with Ti=20s)
+  - Projection term: `wart_akcji -= e·(1/Te - 1/Ti)` compensates for Te≠Ti
+  - **Purpose**: Make Q controller behave like PI at initialization (bumpless transfer)
+  - **Fixed 2026-01-15**: Now works correctly after Bug #8 and #10 fixes
+  - Use for paper/publication comparing projection approach
 
-**Key Finding**: Staged learning eliminates need for projection by maintaining small Te-Ti difference. Projection cannot compensate for 10× mismatch and corrupts Q-learning process.
+**Projection Function Mathematics**:
+- PI control: `u_inc = Kp·dt·(de + e/Ti)`
+- Q2d state: `s = de + e/Te` (uses Te, not Ti)
+- With identity Q-matrix: `action ≈ state_value = de + e/Te`
+- Projection converts: `(de + e/Te) - e·(1/Te - 1/Ti) = de + e/Ti` ✓ matches PI!
+
+**Key Insight**: Projection mathematically converts Q2d action (Te-based) to PI-equivalent (Ti-based), enabling bumpless initialization even with large Te-Ti mismatch.
 
 ## Dead Time Compensation
 
@@ -392,6 +398,27 @@ T = [5 2]; nr_modelu = 3; Ks = tf(1,[5 1])*tf(1,[2 1]);
 - Provide helpful error messages indicating how to fix the issue
 - Include current value in error messages for easier debugging
 
+**Python Tools**:
+- **BEFORE** creating any Python script, check if required packages are installed:
+  ```bash
+  pip list | grep -iE "package1|package2"
+  ```
+- If packages are missing, **ASK the user** to install them before proceeding
+- Use only packages from the approved list below (or ask user to approve new ones)
+- Keep Python scripts simple and focused on single tasks (diagnostics, analysis, parsing)
+
+**Available Python Packages** (verified installed):
+| Package | Version | Purpose |
+|---------|---------|---------|
+| numpy | 1.26.4 | Array operations, numerical computations |
+| pandas | 2.1.4 | Data manipulation, CSV/JSON parsing, tabular analysis |
+| matplotlib | 3.6.3 | Plotting, visualization |
+| scipy | 1.11.4 | Signal processing, statistics, optimization |
+| seaborn | 0.13.2 | Statistical visualizations, heatmaps |
+| tqdm | 0.0.0 | Progress bars for long analyses |
+
+**Built-in modules** (no install needed): `json`, `os`, `sys`, `re`, `glob`, `pathlib`
+
 **Verification Flow**:
 - First run (before learning): stores `logi_before_learning`
 - Second run (after learning): uses `logi`
@@ -455,9 +482,18 @@ T = [5 2]; nr_modelu = 3; Ks = tf(1,[5 1])*tf(1,[2 1]);
 - Constraints: Force exploration (≠best), protect goal action, directional (same-side)
 - RD parameter (default 5) controls exploration width
 
-## Critical Bug Fixes (2025-01-23/24)
+**On-Trajectory Problem** (Critical for Projection Mode):
+- Q2d state: `s = de + e/Te` measures deviation from target trajectory
+- When system follows trajectory perfectly: `s ≈ 0` (goal state) regardless of error magnitude!
+- Example: e=30%, de=-6 with Te=5 → s = -6 + 30/5 = 0 (at goal!)
+- **Consequence**: Identity Q-matrix returns action=0, controller does nothing
+- **Solution**: Projection function must ALWAYS be applied when error is large
+- This is why Bug #10 fix changed from state-based to error-based condition
+- **Key equation**: After projection, `action = (de + e/Te) - e·(1/Te - 1/Ti) = de + e/Ti` (matches PI)
 
-**All experiments before 2025-01-23 must be re-run.** Five critical bugs were discovered and fixed:
+## Critical Bug Fixes (2025-01-23 to 2026-01-15)
+
+**All experiments before 2026-01-15 must be re-run.** Ten critical bugs were discovered and fixed:
 
 ### Bug #1: Exploration Constraint Inverted
 **File**: m_losowanie_nowe.m
@@ -538,6 +574,56 @@ if wyb_akcja3 ~= wyb_akcja && wyb_akcja3 ~= nr_akcji_doc && ...
 - TD error: Decreasing ✓
 
 **T0=4**: Expected to converge with Bug #5 fix
+
+### Bug #8: Te Not Set for Projection Mode (2026-01-13)
+**File**: m_inicjalizacja.m, main.m
+**Problem**: Te was always initialized to Ti in m_inicjalizacja.m, even when f_rzutujaca_on=1
+- With Te=Ti, projection = `e·(1/Te - 1/Ti) = 0` (no projection applied!)
+- State space generated with wrong granularity
+**Fix**: main.m lines 16-24 override Te based on f_rzutujaca_on:
+```matlab
+if f_rzutujaca_on == 1
+    Te = Te_bazowe;  % Projection mode: use goal Te
+else
+    Te = Ti;         % Staged learning: start at Ti
+end
+```
+**Impact**: Projection now calculated correctly with Te≠Ti
+
+### Bug #9: Array Overflow in Verification (2026-01-13)
+**File**: m_eksperyment_weryfikacyjny.m
+**Problem**: Array index exceeded bounds during verification experiment
+**Fix**: Added bounds checking and proper array sizing
+**Impact**: Verification experiments complete without errors
+
+### Bug #10: Projection Disabled at Goal State (2026-01-15)
+**File**: m_regulator_Q.m (lines 250-268)
+**Problem**: Two conditions prevented projection from being applied:
+1. **State-based exclusion**: Projection disabled when `state ∈ {49, 50, 51}` (near goal)
+   - With Te=5, Ti=20: state_value = de + e/Te ≈ 0 even with 30% error!
+   - System on target trajectory → state near goal → projection disabled
+   - Q controller did nothing while PI correctly drove output
+2. **Sign check failure**: When `wart_akcji = 0` (at goal state), sign check `(wart_akcji<0 && ...) || (wart_akcji>0 && ...)` was FALSE
+   - Projection never applied at goal state
+**Root Cause Analysis**:
+```
+Sample 20: e=29.42%, de=-5.78, state_value = -5.78 + 29.42/5 = 0.10 ≈ 0
+           → state=50 (goal!) → action=0 → Q does nothing
+           → PI correctly gives: Kp·dt·(de + e/Ti) = -0.45
+```
+**Fix**: Changed condition from state-based to error-based:
+```matlab
+% OLD (broken): Excluded states {49,50,51}
+if f_rzutujaca_on == 1 && (stan ~= nr_stanu_doc && stan ~= nr_stanu_doc+1 && ...
+        stan ~= nr_stanu_doc-1 && abs(e) >= dokladnosc_gen_stanu)
+    if wart_akcji<0 && ... || wart_akcji>0 && ...  % Sign check failed for 0
+        wart_akcji = wart_akcji - funkcja_rzutujaca;
+
+% NEW (fixed): Only check error magnitude, always apply projection
+if f_rzutujaca_on == 1 && abs(e) >= dokladnosc_gen_stanu
+    wart_akcji = wart_akcji - funkcja_rzutujaca;  % No sign check
+```
+**Impact**: Q controller now matches PI behavior during initialization transient
 
 ### Debug System
 Enable in config.m: `debug_logging = 1`

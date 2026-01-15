@@ -1,7 +1,7 @@
 clear all
 close all
 clc
-rng(1)
+rng(2)
 
 %to do, brak rysowania przy poj iteracji uczenia
 
@@ -26,7 +26,30 @@ end
 % Generate state and action spaces
 [stany, akcje_sr, ilosc_stanow, ile_akcji, nr_stanu_doc, nr_akcji_doc] = ...
     f_generuj_stany_v2(dokladnosc_gen_stanu, oczekiwana_ilosc_stanow, ograniczenie_sterowania_gora, Te, Kp, dt);
- 
+
+% VALIDATION CHECKS (2026-01-13): Verify state/action space correctness
+fprintf('=== State/Action Space Validation ===\n');
+fprintf('State space:  %d states, range [%.2f, %.2f]\n', ilosc_stanow, min(stany), max(stany));
+fprintf('Action space: %d actions, range [%.2f, %.2f]\n', ile_akcji, min(akcje_sr), max(akcje_sr));
+fprintf('Goal state:   index %d, boundary %.4f\n', nr_stanu_doc, stany(nr_stanu_doc));
+fprintf('Goal action:  index %d, value %.4f (expected 0)\n', nr_akcji_doc, akcje_sr(nr_akcji_doc));
+
+% Check goal action is at zero (actions have actual values, not boundaries)
+if abs(akcje_sr(nr_akcji_doc)) > 1e-10
+    warning('Goal action value is not zero! Value: %.6f', akcje_sr(nr_akcji_doc));
+end
+
+% Check symmetry (goal should be at center index)
+expected_goal_idx = floor(ilosc_stanow / 2) + 1;
+if nr_stanu_doc ~= expected_goal_idx
+    warning('Goal state index mismatch! Expected %d, got %d', expected_goal_idx, nr_stanu_doc);
+end
+
+% Note: State array contains boundaries, not centers
+% Goal state range is approximately [stany(nr_stanu_doc), stany(nr_stanu_doc+1)]
+fprintf('Note: State %d range is [%.4f, %.4f]\n', nr_stanu_doc, stany(nr_stanu_doc), stany(nr_stanu_doc+1));
+fprintf('=====================================\n\n');
+
 % Initialize Q-learning matrix
 [Q_2d, Q_2d_old] = f_generuj_macierz_Q_2d(ilosc_stanow+1, ile_akcji, nagroda, gamma);
 Q_2d_save = Q_2d;
@@ -105,6 +128,9 @@ wek_Te = wek_Te(1:idx_realizacja);
 trim_logi = 1;
 m_zapis_logow;
 
+% Export training data to JSON if debug logging enabled
+f_export_debug_json(logi, 'logi_training.json', debug_logging);
+
 % Single iteration mode: show training plots
 if poj_iteracja_uczenia == 1
     m_rysuj_wykresy
@@ -113,6 +139,10 @@ end
 % Verification mode: run final verification and generate comparison plots
 if poj_iteracja_uczenia == 0
     m_eksperyment_weryfikacyjny
+
+    % Export final verification data to JSON if debug logging enabled
+    f_export_debug_json(logi, 'logi_after_learning.json', debug_logging);
+
     m_rysuj_wykresy  % Show all comparison plots (before vs after learning)
     figure()
     mesh(Q_2d)

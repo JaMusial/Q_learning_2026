@@ -64,6 +64,8 @@ if iter <= ilosc_probek_sterowanie_reczne
     % Initialize variables for projection function (no buffering during manual control)
     e_T0 = e;
     old_stan_T0 = stan;
+    wyb_akcja_T0 = wyb_akcja;
+    uczenie_T0 = uczenie;
 
     t = t + dt;
 
@@ -245,11 +247,21 @@ wart_akcji_bez_f_rzutujacej = wart_akcji;
 % Apply projection function if enabled
 % NOTE 2025-12-01: Projection ALWAYS uses CURRENT error/state (not buffered)
 % Rationale: Projection modifies the control signal applied to plant RIGHT NOW
-if f_rzutujaca_on == 1 && (stan ~= nr_stanu_doc && stan ~= nr_stanu_doc+1 && ...
-        stan ~= nr_stanu_doc-1 && abs(e) >= dokladnosc_gen_stanu)
+%
+% FIX 2026-01-15: Changed condition from state-based to error-based exclusion
+% OLD BUG: Excluded states {49,50,51} which disabled projection when system
+%          was on target trajectory (state_value ≈ 0) even with large error.
+%          This caused Q controller to do nothing while PI drove output.
+% NEW: Only disable projection when error is truly small (< precision)
+if f_rzutujaca_on == 1 && abs(e) >= dokladnosc_gen_stanu
     funkcja_rzutujaca = (e * (1/Te - 1/Ti));
     % NOTE 2025-01-28: SUBTRACTION is mathematically correct (Paper Eq. 7)
     % Required for initialization to match PI controller behavior
+    %
+    % FIX 2026-01-15: Always apply projection, removed sign check
+    % OLD BUG: Sign check (wart_akcji<0 && ... || wart_akcji>0 && ...) failed
+    %          when wart_akcji=0 (at goal state), preventing projection.
+    % NEW: Always apply projection - the math is correct regardless of sign
     wart_akcji = wart_akcji - funkcja_rzutujaca;
 else
     funkcja_rzutujaca = 0;

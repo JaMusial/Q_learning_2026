@@ -12,9 +12,13 @@ if reset_logi==1 || exist('logi','var') == 0
     % Preallocate arrays to maximum iteration size for performance
     % Round to integer since normrnd() can return float values
     % In single iteration mode: allocate for all epochs (logs accumulate)
-    % In verification mode: allocate for one epoch (logs reset each epoch)
+    % In verification mode: allocate for verification experiment duration
     if exist('poj_iteracja_uczenia', 'var') && poj_iteracja_uczenia == 1
         max_samples = round(max_epoki * maksymalna_ilosc_iteracji_uczenia);
+    elseif exist('eks_wer', 'var') && eks_wer == 1
+        % BUG FIX 2026-01-13: Verification experiment duration may exceed maksymalna_ilosc_iteracji_uczenia
+        % Calculate samples from experiment time: czas_eksp_wer/dt + manual control samples
+        max_samples = round(czas_eksp_wer / dt) + round(T0/dt) + dodatkowe_probki_reka + 100;  % +100 safety margin
     else
         max_samples = round(maksymalna_ilosc_iteracji_uczenia);
     end
@@ -190,7 +194,7 @@ if zapis_logi==1
         if exist('nr_stanu_doc', 'var') && exist('nr_akcji_doc', 'var')
             logi.DEBUG_goal_Q(logi_idx) = Q_2d(nr_stanu_doc, nr_akcji_doc);
             logi.DEBUG_is_goal_state(logi_idx) = (stan == nr_stanu_doc);
-            if exist('old_stan_T0', 'var')
+            if exist('old_stan_T0', 'var') && exist('uczenie_T0', 'var')
                 logi.DEBUG_is_updating_goal(logi_idx) = (old_stan_T0 == nr_stanu_doc && uczenie_T0 == 1);
             end
         end

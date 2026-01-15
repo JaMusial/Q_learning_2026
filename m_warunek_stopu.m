@@ -54,7 +54,7 @@ end
 % Episode ends when maximum iteration count exceeded.
 % Track termination reason: stabilization vs timeout.
 
-if iteracja_uczenia > maksymalna_ilosc_iteracji_uczenia
+if iteracja_uczenia > maksymalna_ilosc_iteracji_uczenia || stan_ustalony_probka > oczekiwana_ilosc_probek_stabulizacji
     % Determine termination reason
     if stan_ustalony_probka > oczekiwana_ilosc_probek_stabulizacji
         % Episode ended due to stabilization (desired outcome)

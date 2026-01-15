@@ -9,15 +9,19 @@
 
 %% --- Simulation Control ---
 poj_iteracja_uczenia = 0;          % 1=single iteration mode, 0=full verification with metrics
-max_epoki = 2000;                    % Training duration (500 for testing, 5000+ for full training)
+max_epoki = 100;                    % Training duration (500 for testing, 5000+ for full training)
 maksymalna_ilosc_iteracji_uczenia = 4000;  % Max samples per epoch
 czas_eksp_wer = 600;               % Verification experiment time [s]
 gif_on = 0;                        % 1=generate GIF animation, 0=disabled
 
 %% --- Debug Logging ---
 % Enables detailed Q-learning diagnostics in logi.DEBUG_* fields
+% When enabled, automatically exports JSON files:
+%   - logi_before_learning.json  (after first verification)
+%   - logi_training.json         (after training loop)
+%   - logi_after_learning.json   (after final verification)
 % WARNING: Adds computational overhead (~10-15%), use only for debugging
-debug_logging = 0;                 % 1=enable detailed debug logs, 0=disabled (default: 0 for production)
+debug_logging = 0;                 % 1=enable detailed debug logs + JSON export, 0=disabled (default: 0 for production)
 
 %% --- Learning Mode ---
 uczenie_obciazeniowe = 1;          % 1=learn with disturbances, 0=setpoint changes (mutually exclusive)
@@ -56,8 +60,8 @@ k = 1;                             % Process gain
 % T = [2.34 1.55 9.38];              % Time constants [s] - adjust dimensions per model
 % T=[5 2];
 T = [5];
-T0 = 4;                            % Plant dead time (physical reality) [s]
-T0_controller = 2;                % Controller compensation dead time [s] (0=no compensation)
+T0 = 2;                            % Plant dead time (physical reality) [s]
+T0_controller = T0;                % Controller compensation dead time [s] (0=no compensation)
 SP_ini = 50;                       % Initial setpoint [%]
 
 %% --- PI Controller Parameters ---
@@ -69,7 +73,7 @@ dt_PID = 0.1;                      % PI sampling time [s]
 
 %% --- Q-Learning Controller Parameters ---
 dt = 0.1;                          % Sampling time [s] (must equal dt_PID)
-Te_bazowe = 10;                     % Goal time constant [s]
+Te_bazowe = 5;                     % Goal time constant [s]
 kQ = Kp;                           % Q-controller gain (set to Kp for bumpless transfer)
 
 % Learning parameters
@@ -101,7 +105,7 @@ max_powtorzen_losowania = 10;      % Max randomization attempts
 max_powtorzen_losowania_RD = 10;   % Max RD randomization attempts
 
 %% --- Convergence & Trajectory Tracking ---
-oczekiwana_ilosc_probek_stabulizacji = 20;  % Expected stabilization samples
+oczekiwana_ilosc_probek_stabulizacji = 40;  % Expected stabilization samples
 probkowanie_norma_macierzy = 100;           % Q-matrix norm sampling interval (epochs)
 ilosc_probek_procent_realizacjii = round(50 / dt);  % Trajectory realization window size [iterations]
 przesuniecie_okno_procent_realizacji = round(ilosc_probek_procent_realizacjii / 4);  % Window shift (unused)
