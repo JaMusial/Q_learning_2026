@@ -8,8 +8,8 @@
 %% ========================================================================
 
 %% --- Simulation Control ---
-poj_iteracja_uczenia = 0;          % 1=single iteration mode, 0=full verification with metrics
-max_epoki = 100;                    % Training duration (500 for testing, 5000+ for full training)
+poj_iteracja_uczenia = 1;          % 1=single iteration mode, 0=full verification with metrics
+max_epoki = 50;                    % Training duration (500 for testing, 5000+ for full training)
 maksymalna_ilosc_iteracji_uczenia = 4000;  % Max samples per epoch
 czas_eksp_wer = 600;               % Verification experiment time [s]
 gif_on = 0;                        % 1=generate GIF animation, 0=disabled
@@ -21,7 +21,7 @@ gif_on = 0;                        % 1=generate GIF animation, 0=disabled
 %   - logi_training.json         (after training loop)
 %   - logi_after_learning.json   (after final verification)
 % WARNING: Adds computational overhead (~10-15%), use only for debugging
-debug_logging = 0;                 % 1=enable detailed debug logs + JSON export, 0=disabled (default: 0 for production)
+debug_logging = 1;                 % 1=enable detailed debug logs + JSON export, 0=disabled (default: 0 for production)
 
 %% --- Learning Mode ---
 uczenie_obciazeniowe = 1;          % 1=learn with disturbances, 0=setpoint changes (mutually exclusive)
@@ -60,7 +60,7 @@ k = 1;                             % Process gain
 % T = [2.34 1.55 9.38];              % Time constants [s] - adjust dimensions per model
 % T=[5 2];
 T = [5];
-T0 = 2;                            % Plant dead time (physical reality) [s]
+T0 = 0.5;                            % Plant dead time (physical reality) [s]
 T0_controller = T0;                % Controller compensation dead time [s] (0=no compensation)
 SP_ini = 50;                       % Initial setpoint [%]
 

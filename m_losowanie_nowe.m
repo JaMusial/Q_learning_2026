@@ -49,7 +49,7 @@ if f_rzutujaca_on == 1
     max_losowanie = min(ile_akcji, wyb_akcja + RD);   % Clamp to valid range
 
     % Sample random action
-    wyb_akcja3 = randi([min_losowanie, max_losowanie], [1, 1]);
+    wyb_akcja_los = randi([min_losowanie, max_losowanie], [1, 1]);
 
     % Apply constraints:
     % 1. Don't select same action as best (force exploration)
@@ -57,11 +57,11 @@ if f_rzutujaca_on == 1
     % 3. SAME-SIDE MATCHING: Action must be on same side as State
     %    State > goal (negative s) → Action > goal (negative Du)
     %    State < goal (positive s) → Action < goal (positive Du)
-    if wyb_akcja3 ~= wyb_akcja && wyb_akcja3 ~= nr_akcji_doc && ...
-           ((wyb_akcja3 > nr_akcji_doc && stan > nr_stanu_doc) || ...
-            (wyb_akcja3 < nr_akcji_doc && stan < nr_stanu_doc))
+    if wyb_akcja_los ~= wyb_akcja && wyb_akcja_los ~= nr_akcji_doc && ...
+           ((wyb_akcja_los > nr_akcji_doc && stan > nr_stanu_doc) || ...
+            (wyb_akcja_los < nr_akcji_doc && stan < nr_stanu_doc))
         ponowne_losowanie = 0;  % Accept
-        wyb_akcja = wyb_akcja3;
+        wyb_akcja = wyb_akcja_los;
     else
         ponowne_losowanie = ponowne_losowanie + 1;  % Reject, retry
     end
@@ -84,9 +84,9 @@ end
 
 % Sample random action from range
 if max_losowanie > min_losowanie
-    wyb_akcja3=randi([min_losowanie, max_losowanie], [1, 1]);
+    wyb_akcja_los=randi([min_losowanie, max_losowanie], [1, 1]);
 else
-    wyb_akcja3=randi([max_losowanie, min_losowanie], [1, 1]);
+    wyb_akcja_los=randi([max_losowanie, min_losowanie], [1, 1]);
 end
 
 % Apply directional constraint (SAME-SIDE MATCHING)
@@ -95,11 +95,11 @@ end
 % Constraint: Action must be on SAME SIDE as State
 %   State > goal (negative s) → Action > goal (negative Du)
 %   State < goal (positive s) → Action < goal (positive Du)
-if wyb_akcja3~=nr_akcji_doc && wyb_akcja3 ~= wyb_akcja &&...
-        ((wyb_akcja3 > nr_akcji_doc && stan > nr_stanu_doc) ||...
-        (wyb_akcja3 < nr_akcji_doc && stan < nr_stanu_doc))
+if wyb_akcja_los~=nr_akcji_doc && wyb_akcja_los ~= wyb_akcja &&...
+        ((wyb_akcja_los > nr_akcji_doc && stan > nr_stanu_doc) ||...
+        (wyb_akcja_los < nr_akcji_doc && stan < nr_stanu_doc))
     ponowne_losowanie=0;
-    wyb_akcja=wyb_akcja3;
+    wyb_akcja=wyb_akcja_los;
 else
     ponowne_losowanie=ponowne_losowanie+1;
 end

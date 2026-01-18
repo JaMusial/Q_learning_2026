@@ -17,7 +17,14 @@
       "Bash(git remote set-url:*)",
       "Bash(ssh-keyscan:*)",
       "Bash(~/.ssh/known_hosts)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(ls:*)",
+      "Bash(git gc:*)",
+      "Bash(git log:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git cat-file -t 98d11070f65dab70c6520c4b4d18ad34ce450281)",
+      "Bash(git rev-parse HEAD^{tree})",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

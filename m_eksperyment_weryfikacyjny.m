@@ -95,6 +95,7 @@ if T0_controller ~= 0
     bufor_wyb_akcja = zeros(1, round(T0_controller/dt));
     bufor_uczenie = zeros(1, round(T0_controller/dt));
     bufor_e = zeros(1, round(T0_controller/dt));  % Error buffer for projection temporal consistency
+    bufor_credit = ones(1, round(T0_controller/dt));  % Credit ratio buffer (1.0 = full credit)
 end
 
 %% =====================================================================

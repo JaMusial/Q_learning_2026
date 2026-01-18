@@ -23,3 +23,8 @@ profiler_test.m
 Thumbs.db
 # Log files
 *.json
+/Ucznir T5T04TC0
+/Uczenie_T5T04TC4
+/Uczenie_T5T04TC2
+test_units.m
+test_stan_value_calc.m

@@ -159,7 +159,7 @@ else
 
             wart_akcji = akcje_sr(wyb_akcja);
 
-        elseif stan ~= 0
+        else
             % Exploitation: Select best action
             [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
             wart_akcji = akcje_sr(wyb_akcja);
@@ -171,14 +171,38 @@ else
     %% ========================================================================
     %% Delayed credit assignment (buffer state-action pairs)
     %% ========================================================================
-    % NOW buffer the correctly matched (stan, wyb_akcja) pair
+    % Buffer the correctly matched (stan, wyb_akcja) pair
+    %
+    % NOTE 2026-01-15: For projection mode with T0>0, we DISABLE Q-learning
+    % when projection significantly contributes to control. This avoids credit
+    % assignment mismatch where Q-learning would credit Q-actions for outcomes
+    % that were actually caused by the projection function.
+    %
+    % The problem: If we buffer raw action, Q learns wrong values (projection did the work)
+    %              If we buffer effective action, it maps to action 50 (do nothing)
+    % Solution: Don't update Q when projection dominates control
 
     if T0_controller > 0
-        % Buffer current state, action for delayed credit assignment
+        % FIX 2026-01-15: For projection mode with T0>0, limit learning to near-setpoint.
+        %
+        % Problem: Control = Q_action - projection. With T0>0, we cannot correctly
+        % attribute the outcome to Q vs projection. Any approach to partial credit
+        % fails because Q-action and -projection always have opposite signs for
+        % identity Q-matrix, disabling almost all learning.
+        %
+        % Practical solution: Only update Q in the "fine control" region near setpoint
+        % where projection contribution is small (|e| < threshold).
+        % NOTE 2026-01-16: Removed Bug #11 error threshold restriction.
+        % The error threshold (|e| > 2%) disabled learning during transients but
+        % didn't fix credit assignment (ratio Te/Ti is constant regardless of error).
+        % New approach: projection is disabled near goal state and sign-protected
+        % to allow learning during transients while maintaining correct behavior.
+
+        % Buffer current state, RAW action
         [old_stan_T0, bufor_state] = f_bufor(stan, bufor_state);
         [wyb_akcja_T0, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);
         [uczenie_T0, bufor_uczenie] = f_bufor(uczenie, bufor_uczenie);
-        [e_T0, bufor_e] = f_bufor(e, bufor_e);  % Buffer error (not used but kept for consistency)
+        [e_T0, bufor_e] = f_bufor(e, bufor_e);
 
         % Use CURRENT state as next state (effect is visible now)
         stan_T0 = stan;
@@ -248,21 +272,51 @@ wart_akcji_bez_f_rzutujacej = wart_akcji;
 % NOTE 2025-12-01: Projection ALWAYS uses CURRENT error/state (not buffered)
 % Rationale: Projection modifies the control signal applied to plant RIGHT NOW
 %
-% FIX 2026-01-15: Changed condition from state-based to error-based exclusion
-% OLD BUG: Excluded states {49,50,51} which disabled projection when system
-%          was on target trajectory (state_value ≈ 0) even with large error.
-%          This caused Q controller to do nothing while PI drove output.
-% NEW: Only disable projection when error is truly small (< precision)
-if f_rzutujaca_on == 1 && abs(e) >= dokladnosc_gen_stanu
+% FIX 2026-01-18: Conditional sign protection based on error magnitude.
+%
+% Key changes:
+% 1. Turn off if error is very small - already at setpoint, no projection needed
+% 2. For LARGE errors (transients): Allow projection to flip sign
+%    - This is ESSENTIAL for bumpless transfer during setpoint changes
+%    - Projection translates Te→Ti control, which often requires sign flip
+%    - Example: State 49 gives action=+0.2, projection=-4.2 → final=-4.0 (matches PI)
+% 3. For SMALL errors (steady state): Apply sign protection
+%    - Prevents instability near setpoint where sign flips can cause oscillation
+%
+% Uses continuous state_value to avoid quantization errors (Bug #12 fix).
+if f_rzutujaca_on == 1
+    % Calculate projection value
     funkcja_rzutujaca = (e * (1/Te - 1/Ti));
-    % NOTE 2025-01-28: SUBTRACTION is mathematically correct (Paper Eq. 7)
-    % Required for initialization to match PI controller behavior
-    %
-    % FIX 2026-01-15: Always apply projection, removed sign check
-    % OLD BUG: Sign check (wart_akcji<0 && ... || wart_akcji>0 && ...) failed
-    %          when wart_akcji=0 (at goal state), preventing projection.
-    % NEW: Always apply projection - the math is correct regardless of sign
-    wart_akcji = wart_akcji - funkcja_rzutujaca;
+
+    % Threshold: errors larger than 2x precision are "large" (transient)
+    % e.g., dokladnosc_gen_stanu=0.5 → large_error > 1%
+    large_error_threshold = dokladnosc_gen_stanu * 2;
+    large_error = abs(e) > large_error_threshold;
+
+    % Turn off projection if error is very small (already at setpoint)
+    very_small_error = abs(e) <= dokladnosc_gen_stanu;
+
+    if very_small_error
+        % Already at setpoint: don't apply projection
+        % Keep wart_akcji unchanged (preserves Q-table's learned action)
+        funkcja_rzutujaca = 0;
+    elseif large_error
+        % Large error (transient): Apply projection WITHOUT sign protection
+        % This allows proper Te→Ti translation for bumpless transfer
+        wart_akcji = wart_akcji - funkcja_rzutujaca;
+    else
+        % Small error (near steady state): Apply projection WITH sign protection
+        wart_akcji_po_proj = wart_akcji - funkcja_rzutujaca;
+
+        % Sign protection: don't let projection flip control direction
+        if wart_akcji ~= 0 && sign(wart_akcji_po_proj) ~= sign(wart_akcji)
+            % Projection would flip sign - disable it to prevent instability
+            funkcja_rzutujaca = 0;
+            wart_akcji = wart_akcji - funkcja_rzutujaca;
+        else
+            wart_akcji = wart_akcji_po_proj;
+        end
+    end
 else
     funkcja_rzutujaca = 0;
 end
