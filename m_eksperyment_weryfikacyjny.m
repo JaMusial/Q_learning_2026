@@ -90,12 +90,14 @@ if T0 ~= 0
 end
 
 % Reset controller compensation buffers for clean verification test
+% FIX 2026-01-19: Buffer size = T0_controller/dt + 1 for correct temporal alignment
 if T0_controller ~= 0
-    bufor_state = zeros(1, round(T0_controller/dt));
-    bufor_wyb_akcja = zeros(1, round(T0_controller/dt));
-    bufor_uczenie = zeros(1, round(T0_controller/dt));
-    bufor_e = zeros(1, round(T0_controller/dt));  % Error buffer for projection temporal consistency
-    bufor_credit = ones(1, round(T0_controller/dt));  % Credit ratio buffer (1.0 = full credit)
+    buffer_size_controller = round(T0_controller/dt) + 1;
+    bufor_state = zeros(1, buffer_size_controller);
+    bufor_wyb_akcja = zeros(1, buffer_size_controller);
+    bufor_uczenie = zeros(1, buffer_size_controller);
+    bufor_e = zeros(1, buffer_size_controller);  % Error buffer for projection temporal consistency
+    bufor_credit = ones(1, buffer_size_controller);  % Credit ratio buffer (1.0 = full credit)
 end
 
 %% =====================================================================

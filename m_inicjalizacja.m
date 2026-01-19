@@ -210,14 +210,17 @@ if T0 ~= 0
 end
 
 % Controller compensation buffers (what controller thinks - for delayed credit assignment)
+% FIX 2026-01-19: Buffer size = T0_controller/dt + 1 for correct temporal alignment
+% Rationale: y[k] reflects u[k-11] (not u[k-10]) due to plant update timing
 if T0_controller ~= 0
-    bufor_state = zeros(1, round(T0_controller/dt));
-    bufor_wyb_akcja = zeros(1, round(T0_controller/dt));
-    bufor_uczenie = zeros(1, round(T0_controller/dt));
-    bufor_e = zeros(1, round(T0_controller/dt));  % Error buffer for projection temporal consistency
-    bufor_credit = ones(1, round(T0_controller/dt));  % Credit ratio buffer (1.0 = full credit)
-    fprintf('    Controller buffers: T0_controller=%g s, size=%d samples\n', ...
-            T0_controller, round(T0_controller/dt));
+    buffer_size_controller = round(T0_controller/dt) + 1;
+    bufor_state = zeros(1, buffer_size_controller);
+    bufor_wyb_akcja = zeros(1, buffer_size_controller);
+    bufor_uczenie = zeros(1, buffer_size_controller);
+    bufor_e = zeros(1, buffer_size_controller);  % Error buffer for projection temporal consistency
+    bufor_credit = ones(1, buffer_size_controller);  % Credit ratio buffer (1.0 = full credit)
+    fprintf('    Controller buffers: T0_controller=%g s, size=%d samples (T0/dt + 1)\n', ...
+            T0_controller, buffer_size_controller);
 end
 
 fprintf('\n=== Initialization Complete ===\n');
