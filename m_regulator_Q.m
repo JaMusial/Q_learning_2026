@@ -253,8 +253,19 @@ else
     %% ========================================================================
     %% Q-learning update
     %% ========================================================================
+    % FIX 2026-01-19: For projection mode with T0>0, disable learning when buffered error was large
+    % Rationale: Large projection dominates control, creating credit assignment mismatch.
+    % Q(s,a_raw) would be credited for outcome caused by (a_raw - large_projection).
+    % Solution: Use temporally-correct e_T0 (buffered error) to check if learning should occur.
+    if f_rzutujaca_on == 1 && T0_controller > 0
+        large_error_threshold = dokladnosc_gen_stanu * 2;
+        large_error_T0 = abs(e_T0) > large_error_threshold;
+    else
+        large_error_T0 = false;  % Always allow learning when projection off or T0=0
+    end
+
     % Update Q-value for the BUFFERED state-action pair
-    if uczenie_T0 == 1 && pozwolenie_na_uczenia == 1 && stan_T0_for_bootstrap ~= 0 && old_stan_T0 ~= 0
+    if uczenie_T0 == 1 && ~large_error_T0 && pozwolenie_na_uczenia == 1 && stan_T0_for_bootstrap ~= 0 && old_stan_T0 ~= 0
         Q_update = alfa * (R_buffered + gamma * maxS - Q_2d(old_stan_T0, wyb_akcja_T0));
         Q_2d(old_stan_T0, wyb_akcja_T0) = Q_2d(old_stan_T0, wyb_akcja_T0) + Q_update;
     end
@@ -300,7 +311,7 @@ if f_rzutujaca_on == 1
         % Already at setpoint: don't apply projection
         % Keep wart_akcji unchanged (preserves Q-table's learned action)
         funkcja_rzutujaca = 0;
-    elseif large_error && 0
+    elseif large_error
         % Large error (transient): Apply projection WITHOUT sign protection
         % This allows proper Te→Ti translation for bumpless transfer
         wart_akcji = wart_akcji - funkcja_rzutujaca;
