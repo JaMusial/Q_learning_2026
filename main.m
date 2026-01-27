@@ -1,7 +1,7 @@
 clear all
 close all
 clc
-rng(2)
+rng(1)
 
 %to do, brak rysowania przy poj iteracji uczenia
 

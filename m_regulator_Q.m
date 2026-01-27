@@ -260,6 +260,7 @@ else
     if f_rzutujaca_on == 1 && T0_controller > 0
         large_error_threshold = dokladnosc_gen_stanu * 2;
         large_error_T0 = abs(e_T0) > large_error_threshold;
+        large_error_T0=false;
     else
         large_error_T0 = false;  % Always allow learning when projection off or T0=0
     end

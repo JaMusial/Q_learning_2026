@@ -6,7 +6,7 @@
 % - Uppercase symbols Y(t), U(t), lowercase e(t) for error, Ysp
 % - NO numerical claims without experimental proof
 % - Summarize contributions qualitatively
-% - Future work appropriate for THIS version (no staged learning)
+% - Future work includes staged learning
 % - No made-up metrics
 % - Updated: Error symbol changed from E to e throughout
 % ========================================================================
@@ -21,15 +21,17 @@ We have presented a model-free Q-learning controller for industrial process cont
 
 Our work makes the following contributions to Q-learning-based process control:
 
-\noindent\textbf{1. Projection Function for Bumpless Initialization:} We introduced a projection term $\Delta U_{\text{proj}} = -e \cdot (1/T_e - 1/T_I)$ that enables bumpless switching from PI control to Q-learning control even when the desired trajectory time constant $T_e$ differs from the baseline integral time $T_I$. This capability decouples the choice of trajectory time constant from the initialization requirement, providing designers with greater flexibility in specifying closed-loop performance objectives.
+\noindent\textbf{1. Projection Function for Bumpless Initialization:} We introduced a projection term $\Delta U_{\text{proj}} = -e \cdot (1/T_e - 1/T_I)$ that enables bumpless switching from PI control to Q-learning control even when the desired trajectory time constant $T_e$ differs from the baseline integral time $T_I$. The implementation uses continuous state values for numerical precision and incorporates sign protection to ensure stability near the setpoint while allowing proper trajectory translation during transients. This capability decouples the choice of trajectory time constant from the initialization requirement, providing designers with greater flexibility in specifying closed-loop performance objectives.
 
-\noindent\textbf{2. Delayed Credit Assignment for Dead Time:} We developed a buffer-based Q-learning update mechanism that correctly assigns credit to state-action pairs in the presence of process dead time. By decoupling the physical plant dead time ($T_0$) from the controller's compensation strategy ($T_{0,\text{controller}}$), our approach enables systematic investigation of compensation accuracy requirements and robustness to dead time estimation errors.
+\noindent\textbf{2. Delayed Credit Assignment for Dead Time:} We developed a buffer-based Q-learning update mechanism that correctly assigns credit to state-action pairs in the presence of process dead time. By decoupling the physical plant dead time ($T_0$) from the controller's compensation strategy ($T_{0,\text{controller}}$), our approach enables systematic investigation of compensation accuracy requirements and robustness to dead time estimation errors. The buffer design includes temporal alignment correction (+1 sample) and bootstrap override for goal state maintenance, ensuring numerical stability over extended training periods.
 
 \noindent\textbf{3. Geometric State-Action Discretization:} We formulated a geometric action distribution scheme where actions are generated first using a geometric progression and states are placed at action midpoints. This approach provides natural density gradients (fine resolution near the goal, coarse resolution far from goal) and maintains $T_e$-invariant steady-state error tolerance equal to the precision parameter.
 
 \noindent\textbf{4. Validation Framework:} We designed a comprehensive experimental protocol spanning 14 scenarios across two process models, three dead time magnitudes, and three compensation strategies. The clear separation between training mode (with exploration) and verification mode (pure exploitation, $\varepsilon=0$) ensures that performance metrics reflect learned policy quality rather than exploratory actions.
 
-\noindent\textbf{5. Sparse Reward Strategy:} We demonstrated that a sparse reward function ($R=1$ only at the goal state with goal action, $R=0$ otherwise) suffices for learning effective control policies. This simplicity eliminates the need for reward shaping or domain-specific reward engineering, relying instead on the bootstrap mechanism to propagate values throughout the state space.
+\noindent\textbf{5. Same-Side Matching Exploration:} We implemented a constrained exploration strategy that enforces directional consistency between states and actions. This prevents counterproductive exploration where actions would move the system away from the goal, ensuring stable learning even with relatively high exploration rates.
+
+\noindent\textbf{6. Sparse Reward Strategy:} We demonstrated that a sparse reward function ($R=1$ for goal arrival or goal maintenance, $R=0$ otherwise) suffices for learning effective control policies. This simplicity eliminates the need for reward shaping or domain-specific reward engineering, relying instead on the bootstrap mechanism to propagate values throughout the state space.
 
 
 \subsection{Practical Implications}
@@ -62,6 +64,8 @@ Several extensions of this work warrant further investigation:
 \noindent\textbf{Safety-Constrained Learning:} Industrial applications often impose strict safety constraints on process variables (temperature limits, pressure limits, concentration bounds). Incorporating hard constraints into the Q-learning framework through safe exploration strategies or constraint-aware reward functions would enhance industrial applicability.
 
 \noindent\textbf{Transfer Learning Across Operating Regimes:} Many processes operate across multiple regimes with different dynamics. Investigating whether Q-matrices learned in one regime can accelerate learning in related regimes (transfer learning) could reduce commissioning time for multi-regime processes.
+
+\noindent\textbf{Staged Learning with Adaptive Time Constant:} An alternative to the fixed projection function approach would be staged learning, where $T_e$ starts at $T_I$ (eliminating the projection requirement) and gradually decreases toward a target value as learning progresses. This approach would leverage the $T_e$-invariant precision property of our discretization, potentially enabling more effective Q-table refinement across the full state space rather than relying on projection compensation.
 
 \noindent\textbf{Comparison with Alternative RL Methods:} Our work focuses on tabular Q-learning with discrete state-action spaces. Comparing performance, sample efficiency, and computational requirements against alternative reinforcement learning approaches (actor-critic methods, policy gradient methods, function approximation) would provide insight into algorithm selection trade-offs.
 

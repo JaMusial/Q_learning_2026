@@ -9,6 +9,8 @@
 % - Qualitative discussion only (no made-up metrics)
 % - Tuning guidelines without specific numbers
 % - Updated: Error symbol changed from E to e throughout
+% - Updated: Same-side matching discussion
+% - Updated: Sign protection discussion
 % ========================================================================
 
 \section{Discussion}
@@ -23,6 +25,10 @@ Without the projection function, bumpless initialization would require $T_e = T_
 
 The projection term $\Delta U_{\text{proj}} = -e \cdot (1/T_e - 1/T_I)$ compensates for the structural difference between the Q2d controller's trajectory dynamics (based on $T_e$ via the merged state definition) and the PI controller's implicit trajectory dynamics (based on $T_I$ via the integral term). When $T_e = T_I$, the projection term vanishes, and the controller operates without this compensation. When $T_e \neq T_I$, the projection ensures that the initial control law matches the PI baseline behavior despite the time constant mismatch.
 
+The implementation uses the continuous merged state value rather than the discretized action value for the projection calculation. This eliminates quantization errors that would otherwise accumulate, particularly when the projection magnitude is comparable to or larger than the Q-action magnitude. The resulting effective action $a_{\text{eff}} = s - \Delta U_{\text{proj}} = \dot{e} + e/T_I$ precisely matches the PI velocity form.
+
+Additionally, the projection incorporates sign protection based on error magnitude to ensure stability near the setpoint. During transients (large errors), the projection is applied without restriction, allowing proper trajectory translation. Near steady state (small errors), sign protection prevents the projection from reversing the control direction, which could cause oscillations. This conditional application balances the need for accurate trajectory translation during setpoint changes against stability requirements near the operating point.
+
 This design choice reflects a practical engineering consideration: industrial controllers must integrate seamlessly into existing control systems without causing transients or requiring plant shutdowns for commissioning. The projection function addresses this requirement by decoupling the choice of trajectory time constant from the need for bumpless initialization.
 
 
@@ -33,11 +39,13 @@ The delayed credit assignment mechanism addresses a fundamental challenge in app
 
 The effectiveness of this approach depends critically on the accuracy of the dead time estimate used by the controller. When $T_{0,\text{controller}} = T_0$ (matched compensation), the buffers synchronize perfectly with the physical delay, ensuring that each action $a(t)$ is updated based on the state $s(t+T_0)$ that actually reflects its consequence. This temporal alignment is essential for correct Q-value propagation and policy learning.
 
+The buffer size includes an additional sample beyond $\text{round}(T_{0,\text{controller}}/T_s)$ to account for the discrete-time update sequence. This ensures that the buffered state-action pair is paired with the state that actually reflects its consequence, rather than being off by one time step. Additionally, when updating Q-values for goal state-goal action pairs, we override the bootstrap state to the goal state to prevent numerical drift from contaminating the value function. Over many buffer delays, small discretization errors can accumulate, causing the observed next state to be adjacent to (rather than exactly at) the goal. The override ensures that $Q(s_{\text{goal}}, a_{\text{goal}})$ maintains its maximum value despite these numerical effects.
+
 The decoupled parameterization ($T_0$ for the physical plant, $T_{0,\text{controller}}$ for the controller compensation) enables systematic investigation of robustness to dead time estimation errors. Industrial processes often exhibit time-varying delays due to changing operating conditions, flow rates, or measurement configurations. The ability to maintain reasonable performance even when $T_{0,\text{controller}} \neq T_0$ would be valuable for practical deployment.
 
 An important observation from our algorithm design is that even with no explicit compensation ($T_{0,\text{controller}} = 0$), Q-learning should eventually learn a policy that accounts for the delay implicitly through the state-action value function. However, we expect this implicit learning to require significantly more training episodes and potentially converge to suboptimal policies compared to explicit compensation. The experimental results will quantify this trade-off.
 
-The sparse reward strategy ($R=1$ only at the goal state with goal action) interacts with dead time compensation in a subtle way. Because reward is assigned based on arrival at the goal state, the buffering mechanism ensures that actions leading to goal state arrival receive positive reward, while actions leading away from the goal receive zero reward. This creates a value gradient in the Q-matrix that propagates backward through the state space via the bootstrap term $\gamma \max_{a'} Q(s',a')$. The dead time compensation ensures this propagation follows the correct temporal causality.
+The sparse reward strategy ($R=1$ for goal arrival or goal maintenance) interacts with dead time compensation in a subtle way. Because reward is assigned based on arrival at the goal state or maintaining the goal state with goal action, the buffering mechanism ensures that actions leading to goal state arrival receive positive reward, while actions leading away from the goal receive zero reward. This creates a value gradient in the Q-matrix that propagates backward through the state space via the bootstrap term $\gamma \max_{a'} Q(s',a')$. The dead time compensation ensures this propagation follows the correct temporal causality.
 
 
 \subsection{State Space Design and Discretization}
@@ -55,7 +63,9 @@ The Q-matrix initialization as an identity matrix ensures that each state initia
 \subsection{Exploration Strategy and Learning Efficiency}
 \label{subsec:discussion_exploration}
 
-The $\varepsilon$-greedy exploration strategy with constrained action selection balances the need for exploration (discovering potentially better policies) against the risk of destabilizing exploratory actions (causing large errors or control saturation). Our implementation enforces same-side matching: states above the goal state can only explore actions above the goal action, and vice versa. This directional constraint reduces the exploration space but prevents obviously counterproductive actions such as applying positive control increments when the error is already positive and growing.
+The $\varepsilon$-greedy exploration strategy with constrained action selection balances the need for exploration (discovering potentially better policies) against the risk of destabilizing exploratory actions (causing large errors or control saturation). Our implementation enforces \emph{same-side matching}: states above the goal state can only explore actions above the goal action, and vice versa. This directional constraint reduces the exploration space but prevents obviously counterproductive actions such as applying positive control increments when the error is already positive and growing.
+
+The same-side matching constraint is essential for maintaining control stability during exploration. Without it, the $\varepsilon$-greedy policy could select actions that move the system away from the goal, creating oscillatory behavior or prolonged transients. By constraining exploration to actions on the ``correct side'' of the goal action, we ensure that even exploratory actions contribute to error reduction, albeit potentially at a suboptimal rate. This constraint is particularly important in the control context where actions have immediate physical consequences, unlike discrete decision problems where suboptimal actions may only delay reward accumulation.
 
 The exploration rate $\varepsilon = 0.3$ during training represents a relatively high exploration level compared to typical Q-learning applications. This choice reflects the continuous nature of the control problem and the need to visit a wide range of state-action pairs to learn a robust policy. Industrial processes exhibit stochastic disturbances and varying operating conditions, so the learned policy must generalize beyond the specific conditions encountered during training.
 

@@ -75,7 +75,7 @@ This yields 7 experimental scenarios per model: 1 baseline ($T_0=0$) + 3 scenari
 \textbf{Parameter} & \textbf{Symbol} & \textbf{Value} \\
 \hline
 Controller gain & $K_Q$ & 1 (= $K_{PI}$) \\
-Goal time constant & $T_e$ & 10~s \\
+Goal time constant & $T_e$ & 5~s \\
 Baseline integral time & $T_I$ & 20~s \\
 Projection function & -- & Enabled \\
 Learning rate & $\alpha$ & 0.1 \\
@@ -92,7 +92,7 @@ Control limits & $[U_{\min}, U_{\max}]$ & [0, 100]\% \\
 \end{tabular}
 \end{table}
 
-The choice $T_e = 10$~s represents a moderate 2$\times$ speed-up compared to the baseline $T_I = 20$~s. This ratio provides sufficient performance improvement potential while maintaining manageable projection function magnitudes.
+The choice $T_e = 5$~s represents a 4$\times$ speed-up compared to the baseline $T_I = 20$~s. This ratio provides significant performance improvement potential while remaining within the capabilities of typical industrial actuators.
 
 \subsubsection{Learning Protocol}
 
@@ -268,7 +268,7 @@ Our validation strategy systematically evaluates:
 \item \textbf{Learning Effectiveness:} Q-2500ep should outperform PI when dead time is properly compensated
 \item \textbf{Dead Time Compensation:} Matched compensation ($T_{0,c} = T_0$) should yield best results
 \item \textbf{Robustness:} Undercompensation ($T_{0,c} = T_0/2$) should still provide significant benefit over no compensation
-\item \textbf{Projection Function:} Should enable bumpless switching despite $T_e = 10$~s vs. $T_I = 20$~s mismatch
+\item \textbf{Projection Function:} Should enable bumpless switching despite $T_e = 5$~s vs. $T_I = 20$~s mismatch
 \end{enumerate}
 
 The 14 experimental scenarios (7 per model) provide comprehensive coverage of the design space defined by process order, dead time magnitude, and compensation strategy. All performance metrics are computed from verification experiments run in pure exploitation mode ($\varepsilon = 0$) to eliminate the influence of exploratory actions.

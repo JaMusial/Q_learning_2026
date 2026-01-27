@@ -8,6 +8,9 @@
 % - Projection purpose: enables initialization (not just mismatch handling)
 % - Geometric distribution (not exponential as in Q3d)
 % - Updated: Error symbol changed from E to e throughout
+% - Updated: Projection uses continuous state value for precision
+% - Updated: Sign protection for steady-state stability
+% - Updated: Algorithm reflects correct temporal ordering
 % ========================================================================
 
 \section{Q2d Controller with Projection Function}
@@ -107,6 +110,33 @@ U(t) = \text{sat}_{[U_{\min}, U_{\max}]}(U(t))
 \end{equation}
 %
 with typical bounds $U_{\min} = 0\%$ and $U_{\max} = 100\%$ for industrial applications.
+
+\subsubsection{Projection Implementation with Sign Protection}
+
+For improved numerical precision, the projection is implemented using the continuous merged state value rather than the discretized action. The effective action value becomes:
+%
+\begin{equation}
+a_{\text{eff}} = s - \Delta U_{\text{proj}} = \left(\dot{e} + \frac{e}{T_e}\right) - e \cdot \left(\frac{1}{T_e} - \frac{1}{T_I}\right) = \dot{e} + \frac{e}{T_I}
+\label{eq:projection_effective_action}
+\end{equation}
+%
+This formulation ensures that the control law precisely matches the PI velocity form~\eqref{eq:pi_velocity_form}, avoiding quantization errors that would arise from using the discretized action value.
+
+To ensure stability near the setpoint, the projection incorporates sign protection based on error magnitude. We define a threshold $e_{\text{th}} = 2 \cdot \text{prec}$ to distinguish between transient and steady-state operation:
+
+\noindent\textbf{Large Error (Transient):} When $|e| > e_{\text{th}}$, the projection is applied without sign protection. This allows proper trajectory translation during setpoint changes, where the projection may legitimately reverse the control direction. For example, with $T_e = 5$~s and $T_I = 20$~s, a positive error produces negative projection that adjusts the more aggressive $T_e$-based control toward the slower $T_I$-based baseline.
+
+\noindent\textbf{Small Error (Near Steady State):} When $|e| \leq e_{\text{th}}$, sign protection is applied. If the projection would reverse the sign of the control increment, it is disabled to prevent oscillations:
+%
+\begin{equation}
+\Delta U_{\text{proj}} = \begin{cases}
+-e \cdot \left(\frac{1}{T_e} - \frac{1}{T_I}\right) & \text{if } \text{sign}(a - \Delta U_{\text{proj}}) = \text{sign}(a) \\
+0 & \text{otherwise}
+\end{cases}
+\label{eq:sign_protection}
+\end{equation}
+%
+This conditional application ensures stable behavior near the setpoint while maintaining correct trajectory translation during transients.
 
 
 \subsection{State and Action Generation: Geometric Distribution}
@@ -246,7 +276,7 @@ Algorithm~\ref{alg:q2d_control} presents the Q2d control loop with projection fu
 \begin{algorithmic}[1]
 \REQUIRE Q-matrix $Q$, states $\mathcal{S}$, actions $\mathcal{A}$, process, parameters
 \ENSURE Learned Q-matrix $Q$
-\STATE Initialize: $U \gets Y_{sp}/k$, $e_{\text{prev}} \gets 0$
+\STATE Initialize: $U \gets Y_{sp}/k$, $e_{\text{prev}} \gets 0$, $i_{s,\text{prev}} \gets i_{\text{goal}}$, $i_{a,\text{prev}} \gets i_{\text{goal\_action}}$
 \FOR{iteration $t = 1$ to $N_{\text{iterations}}$}
     \STATE \COMMENT{State Calculation}
     \STATE $e \gets Y_{sp} - Y$
@@ -254,29 +284,35 @@ Algorithm~\ref{alg:q2d_control} presents the Q2d control loop with projection fu
     \STATE $s \gets \dot{e} + (1/T_e) \cdot e$
     \STATE $i_s \gets \text{FindState}(s, \mathcal{S})$
     \STATE
-    \STATE \COMMENT{Action Selection}
+    \STATE \COMMENT{Save Previous Iteration Values (for Q-update)}
+    \STATE $i_{s,\text{old}} \gets i_{s,\text{prev}}$; \quad $i_{a,\text{old}} \gets i_{a,\text{prev}}$; \quad $R_{\text{old}} \gets R_{\text{prev}}$
+    \STATE
+    \STATE \COMMENT{Action Selection (before buffering)}
     \IF{$i_s = i_{\text{goal}}$}
-        \STATE $i_a \gets i_{\text{goal\_action}}$ \COMMENT{Force zero at goal}
+        \STATE $i_a \gets i_{\text{goal\_action}}$; \quad $R \gets 1$ \COMMENT{Force zero at goal}
     \ELSE
+        \STATE $R \gets 0$
         \STATE Draw $\xi \sim \mathcal{U}(0,1)$
         \IF{$\xi < \varepsilon$}
-            \STATE $i_a \gets \text{ExploreAction}(i_s)$ \COMMENT{ε-greedy}
+            \STATE $i_a \gets \text{ExploreAction}(i_s, Q)$ \COMMENT{Same-side matching}
         \ELSE
             \STATE $i_a \gets \arg\max_j Q(i_s, j)$
         \ENDIF
     \ENDIF
     \STATE
-    \STATE \COMMENT{Control Computation}
-    \STATE $a \gets \mathcal{A}(i_a)$
-    \STATE $\Delta U_Q \gets K_Q \cdot a \cdot T_s$
-    \STATE $\Delta U_{\text{proj}} \gets -e \cdot (1/T_e - 1/T_I)$
-    \STATE $U \gets U + \Delta U_Q + \Delta U_{\text{proj}}$
+    \STATE \COMMENT{Control Computation with Projection}
+    \STATE $a \gets s$ \COMMENT{Use continuous state value}
+    \STATE $\Delta U_{\text{proj}} \gets \text{ComputeProjection}(e, a)$ \COMMENT{With sign protection}
+    \STATE $U \gets U + K_Q \cdot (a - \Delta U_{\text{proj}}) \cdot T_s$
     \STATE $U \gets \text{sat}_{[U_{\min}, U_{\max}]}(U)$
     \STATE
-    \STATE \COMMENT{Plant Simulation \& Q-Update (Section IV)}
+    \STATE \COMMENT{Plant Simulation}
     \STATE $Y \gets \text{SimulatePlant}(U, T_0)$
-    \STATE Update Q-matrix (see Algorithm~\ref{alg:delayed_credit})
     \STATE
+    \STATE \COMMENT{Q-Update (see Algorithm~\ref{alg:delayed_credit})}
+    \STATE Update Q-matrix using $(i_{s,\text{old}}, i_{a,\text{old}}, R_{\text{old}}, i_s)$
+    \STATE
+    \STATE $i_{s,\text{prev}} \gets i_s$; \quad $i_{a,\text{prev}} \gets i_a$; \quad $R_{\text{prev}} \gets R$
     \STATE $e_{\text{prev}} \gets e$
 \ENDFOR
 \end{algorithmic}
@@ -290,6 +326,13 @@ Algorithm~\ref{alg:q2d_control} presents the Q2d control loop with projection fu
 
 \noindent\textbf{Saturation Handling:} When $U$ saturates, Q-learning updates are disabled to prevent learning from unrealizable actions (anti-windup).
 
-\noindent\textbf{Exploration Strategy:} The function $\text{ExploreAction}(i_s)$ selects actions within a constrained range around the best action, ensuring same-side matching (states above goal select actions above goal action).
+\noindent\textbf{Exploration Strategy with Same-Side Matching:} The function $\text{ExploreAction}(i_s, Q)$ selects actions within a constrained range around the best action, subject to a critical directional constraint called \emph{same-side matching}. This constraint ensures that explored actions maintain correct control direction:
+%
+\begin{itemize}
+\item States above the goal ($i_s > i_{\text{goal}}$, corresponding to $s < 0$) may only select actions above the goal action ($i_a > i_{\text{goal\_action}}$, corresponding to negative control increments)
+\item States below the goal ($i_s < i_{\text{goal}}$, corresponding to $s > 0$) may only select actions below the goal action ($i_a < i_{\text{goal\_action}}$, corresponding to positive control increments)
+\end{itemize}
+%
+This constraint prevents counterproductive exploration, such as applying positive control increments when the error is already positive and growing. The exploration range is further limited by the parameter $RD$ (random deviation), which constrains action selection to $[i_{a,\text{best}} - RD, i_{a,\text{best}} + RD]$ where $i_{a,\text{best}}$ is the best action for the current state according to the Q-matrix. If no valid action satisfying both constraints can be found within a maximum number of attempts, the algorithm falls back to exploitation without Q-update.
 
 The Q-learning update mechanism with dead time compensation is detailed in Section~\ref{sec:deadtime_compensation}.

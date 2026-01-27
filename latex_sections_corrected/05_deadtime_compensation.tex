@@ -7,6 +7,9 @@
 % - No made-up convergence values
 % - Algorithm matches actual implementation
 % - Updated: Error symbol changed from E to e throughout
+% - Updated: Buffer size includes +1 for timing alignment
+% - Updated: Bootstrap override for numerical stability
+% - Updated: Reward logic for goal state maintenance
 % ========================================================================
 
 \section{Dead Time Compensation via Delayed Credit Assignment}
@@ -59,11 +62,11 @@ When dead time exists, this assumption breaks. For example, with $T_0 = 4$~s and
 To resolve this credit assignment problem, we introduce FIFO (first-in-first-out) buffers that store state-action pairs and delay Q-value updates until the consequences become observable. The buffer size is determined by the controller's compensation strategy:
 %
 \begin{equation}
-N_{\text{buffer}} = \left\lfloor \frac{T_{0,\text{controller}}}{T_s} \right\rfloor
+N_{\text{buffer}} = \text{round}\left( \frac{T_{0,\text{controller}}}{T_s} \right) + 1
 \label{eq:buffer_size}
 \end{equation}
 %
-where $\lfloor \cdot \rfloor$ denotes the floor function. For example, with $T_{0,\text{controller}} = 4$~s and $T_s = 0.1$~s, the buffer holds $N_{\text{buffer}} = 40$ elements.
+The additional sample ($+1$) accounts for the discrete-time update sequence: the plant output $Y(k)$ at iteration $k$ reflects the control signal from iteration $k - N_{\text{buffer}}$, requiring one additional buffer element for correct temporal alignment. For example, with $T_{0,\text{controller}} = 4$~s and $T_s = 0.1$~s, the buffer holds $N_{\text{buffer}} = 41$ elements.
 
 Algorithm~\ref{alg:delayed_credit_assignment} presents our delayed credit assignment procedure.
 
@@ -71,7 +74,7 @@ Algorithm~\ref{alg:delayed_credit_assignment} presents our delayed credit assign
 \caption{Delayed Credit Assignment for Dead Time Compensation}
 \label{alg:delayed_credit_assignment}
 \begin{algorithmic}[1]
-\REQUIRE Current state $s_t$, action $a_t$, learning flag $L_t$
+\REQUIRE Current state $s_t$, action $a_t$, learning flag $L_t$, reward $R_t$
 \REQUIRE State buffer $\mathcal{B}_s$, action buffer $\mathcal{B}_a$, learning buffer $\mathcal{B}_L$
 \REQUIRE $T_{0,\text{controller}}$, $T_s$, $i_{\text{goal}}$, $a_{\text{goal}}$
 \ENSURE Updated Q-matrix $Q$, updated buffers
@@ -87,16 +90,16 @@ Algorithm~\ref{alg:delayed_credit_assignment} presents our delayed credit assign
     \STATE \COMMENT{Step 2: Current state is "next state" for delayed action}
     \STATE $s_{\text{next}} \gets s_t$
     \STATE
-    \STATE \COMMENT{Step 3: Reward assignment}
-    \IF{$s_{\text{delayed}} = i_{\text{goal}}$ \AND $a_{\text{delayed}} = a_{\text{goal}}$}
+    \STATE \COMMENT{Step 3: Reward assignment (goal arrival OR goal maintenance)}
+    \IF{$s_{\text{next}} = i_{\text{goal}}$ \OR ($s_{\text{delayed}} = i_{\text{goal}}$ \AND $a_{\text{delayed}} = a_{\text{goal}}$)}
         \STATE $R \gets 1$
     \ELSE
         \STATE $R \gets 0$
     \ENDIF
     \STATE
-    \STATE \COMMENT{Step 4: Bootstrap value computation}
+    \STATE \COMMENT{Step 4: Bootstrap state with goal override for numerical stability}
     \IF{$s_{\text{delayed}} = i_{\text{goal}}$ \AND $a_{\text{delayed}} = a_{\text{goal}}$}
-        \STATE $s_{\text{bootstrap}} \gets i_{\text{goal}}$
+        \STATE $s_{\text{bootstrap}} \gets i_{\text{goal}}$ \COMMENT{Override to prevent drift}
     \ELSE
         \STATE $s_{\text{bootstrap}} \gets s_{\text{next}}$
     \ENDIF
@@ -107,31 +110,37 @@ Algorithm~\ref{alg:delayed_credit_assignment} presents our delayed credit assign
         \STATE \hspace{2em} $+ \alpha \left[R + \gamma \max_{a'} Q(s_{\text{bootstrap}}, a') - Q(s_{\text{delayed}}, a_{\text{delayed}})\right]$
     \ENDIF
 \ELSE
-    \STATE \COMMENT{No Compensation Mode}
+    \STATE \COMMENT{No Compensation Mode (One-Step Q-Learning)}
     \STATE
-    \STATE \COMMENT{Step 1: Use previous state-action for update}
-    \STATE $s_{\text{prev}} \gets s_{t-1}$
-    \STATE $a_{\text{prev}} \gets a_{t-1}$
-    \STATE $L_{\text{prev}} \gets L_{t-1}$
+    \STATE \COMMENT{Step 1: Use previous iteration's state-action-reward}
+    \STATE $s_{\text{prev}} \gets s_{t-1}$; \quad $a_{\text{prev}} \gets a_{t-1}$
+    \STATE $L_{\text{prev}} \gets L_{t-1}$; \quad $R_{\text{prev}} \gets R_{t-1}$
     \STATE
-    \STATE \COMMENT{Step 2: Current state is next state}
+    \STATE \COMMENT{Step 2: Current state is next state for previous pair}
     \STATE $s_{\text{next}} \gets s_t$
     \STATE
-    \STATE \COMMENT{Step 3: Reward based on previous state}
-    \IF{$s_{\text{prev}} = i_{\text{goal}}$ \AND $a_{\text{prev}} = a_{\text{goal}}$}
-        \STATE $R \gets 1$
-    \ELSE
-        \STATE $R \gets 0$
-    \ENDIF
-    \STATE
-    \STATE \COMMENT{Step 4: Q-learning update (one-step TD)}
+    \STATE \COMMENT{Step 3: Q-learning update using previous reward}
     \IF{$L_{\text{prev}} = 1$}
         \STATE $Q(s_{\text{prev}}, a_{\text{prev}}) \gets Q(s_{\text{prev}}, a_{\text{prev}})$
-        \STATE \hspace{2em} $+ \alpha \left[R + \gamma \max_{a'} Q(s_{\text{next}}, a') - Q(s_{\text{prev}}, a_{\text{prev}})\right]$
+        \STATE \hspace{2em} $+ \alpha \left[R_{\text{prev}} + \gamma \max_{a'} Q(s_{\text{next}}, a') - Q(s_{\text{prev}}, a_{\text{prev}})\right]$
     \ENDIF
 \ENDIF
 \end{algorithmic}
 \end{algorithm}
+
+\subsubsection{Reward Logic for Goal State Maintenance}
+
+The reward assignment in Algorithm~\ref{alg:delayed_credit_assignment} includes two conditions that grant positive reward:
+
+\noindent\textbf{Goal Arrival:} $R = 1$ when $s_{\text{next}} = i_{\text{goal}}$, rewarding transitions that successfully reach the goal state.
+
+\noindent\textbf{Goal Maintenance:} $R = 1$ when $s_{\text{delayed}} = i_{\text{goal}}$ and $a_{\text{delayed}} = a_{\text{goal}}$, ensuring that the state-action pair $(i_{\text{goal}}, a_{\text{goal}})$ continues to receive positive reward even when disturbances cause temporary deviations from the goal.
+
+This dual condition ensures that $Q(i_{\text{goal}}, a_{\text{goal}})$ maintains the highest Q-value in the matrix, which is essential for the value gradient that guides the controller toward the goal state.
+
+\subsubsection{Bootstrap Override for Numerical Stability}
+
+When the buffered state-action pair corresponds to the goal state with goal action, the bootstrap state is overridden to the goal state regardless of the actual next state. This prevents numerical drift over the buffer delay from contaminating the Q-value updates. Small discretization errors accumulated over $N_{\text{buffer}}$ time steps can cause the observed next state to be adjacent to (rather than exactly at) the goal state. Without the override, this would cause $Q(i_{\text{goal}}, a_{\text{goal}})$ to bootstrap from a lower-valued adjacent state, inappropriately reducing its value over time.
 
 \subsubsection{Timing Analysis}
 
@@ -162,17 +171,18 @@ This initialization prevents transients caused by zero-filled buffers and simula
 \subsection{Sparse Reward Strategy}
 \label{subsec:sparse_reward}
 
-The choice of reward function significantly influences Q-learning convergence and the resulting policy. We employ a sparse reward strategy that provides positive reward only at the goal state:
+The choice of reward function significantly influences Q-learning convergence and the resulting policy. We employ a sparse reward strategy that provides positive reward based on goal state presence:
 %
 \begin{equation}
-R(s,a) = \begin{cases}
-1 & \text{if } s = s_{\text{goal}} \text{ and } a = a_{\text{goal}} \\
+R = \begin{cases}
+1 & \text{if } s_{\text{next}} = s_{\text{goal}} \text{ (goal arrival)} \\
+1 & \text{if } s = s_{\text{goal}} \text{ and } a = a_{\text{goal}} \text{ (goal maintenance)} \\
 0 & \text{otherwise}
 \end{cases}
 \label{eq:sparse_reward}
 \end{equation}
 %
-where $s_{\text{goal}}$ is the discrete state closest to $s = 0$ and $a_{\text{goal}}$ is the zero control increment action.
+where $s_{\text{goal}}$ is the discrete state closest to $s = 0$, $a_{\text{goal}}$ is the zero control increment action, and $s_{\text{next}}$ is the observed next state after taking action $a$ in state $s$.
 
 \subsubsection{Rationale}
 
