@@ -55,10 +55,6 @@ max_overshoot = zeros(1, NUM_PHASES);
 settling_time = zeros(1, NUM_PHASES);
 max_delta_u = zeros(1, NUM_PHASES);
 
-% Create time vector for settling time calculation
-% Matches data array indexing: time(i) = time at sample i
-time = (0:total_samples-1) * dt;
-
 %% =====================================================================
 %% Calculate metrics for each phase
 %% =====================================================================
@@ -109,29 +105,35 @@ for phase = 1:NUM_PHASES
     end
 
     %% -----------------------------------------------------------------
-    %% max_overshoot: Maximum Error Magnitude
+    %% max_overshoot: Maximum Overshoot / Deviation
     %% -----------------------------------------------------------------
-    % Vectorized: find maximum absolute error in phase
-    errors = abs(SP - y(start_idx:end_idx));
-    max_overshoot(phase) = max(errors);
+    if phase == 1
+        % Phase 1 (SP step): measure true overshoot past setpoint
+        % Determine step direction from initial output value
+        y_initial = y(start_idx);
+        if y_initial < SP
+            % Positive step: overshoot = how much y exceeds SP
+            max_overshoot(phase) = max(0, max(y(start_idx:end_idx)) - SP);
+        else
+            % Negative step: overshoot = how much y drops below SP
+            max_overshoot(phase) = max(0, SP - min(y(start_idx:end_idx)));
+        end
+    else
+        % Phases 2,3 (disturbance): max deviation from SP
+        max_overshoot(phase) = max(abs(SP - y(start_idx:end_idx)));
+    end
 
     %% -----------------------------------------------------------------
     %% settling_time: Time to Settle Within Precision
     %% -----------------------------------------------------------------
-    % Uses re-entry definition: last time error exceeds precision
-    % If never settles, returns phase duration
-
-    settling_time(phase) = (end_idx - start_idx) * dt;  % Default: full phase duration
-    within_tolerance = false;
-
-    for j = start_idx:end_idx
-        if within_tolerance == false && abs(SP - y(j)) <= prec
-            % First entry into tolerance band
-            settling_time(phase) = time(j) - time(start_idx);
-            within_tolerance = true;
-        elseif within_tolerance == true && abs(SP - y(j)) > prec
-            % Exit tolerance band - reset flag
-            within_tolerance = false;
+    % Re-entry definition: backward scan for last sample outside tolerance
+    % If always within tolerance, settling_time = 0
+    % If never settles, settling_time = phase duration
+    settling_time(phase) = 0;
+    for j = end_idx:-1:start_idx
+        if abs(SP - y(j)) > prec
+            settling_time(phase) = (j - start_idx + 1) * dt;
+            break;
         end
     end
 

@@ -1,7 +1,7 @@
 clear all
 close all
 clc
-rng(1)
+rng(3)
 
 %to do, brak rysowania przy poj iteracji uczenia
 
@@ -39,7 +39,7 @@ if abs(akcje_sr(nr_akcji_doc)) > 1e-10
     warning('Goal action value is not zero! Value: %.6f', akcje_sr(nr_akcji_doc));
 end
 
-% Check symmetry (goal should be at center index)
+%Check symmetry (goal should be at center index)
 expected_goal_idx = floor(ilosc_stanow / 2) + 1;
 if nr_stanu_doc ~= expected_goal_idx
     warning('Goal state index mismatch! Expected %d, got %d', expected_goal_idx, nr_stanu_doc);
@@ -147,3 +147,14 @@ if poj_iteracja_uczenia == 0
     figure()
     mesh(Q_2d)
 end
+
+nazwa_zapisanie=['T0 ',num2str(T0),' T0controller ',num2str(T0_controller),' epoki ',num2str(max_epoki)];
+if ~exist('Saved_data','dir')
+    mkdir('Saved_data');
+end
+fname = fullfile('Saved_data',[nazwa_zapisanie,'.mat']);
+if exist(fname,'file')
+    delete(fname);
+end
+save(fname);
+fprintf('Workspace saved to %s\n', fname);

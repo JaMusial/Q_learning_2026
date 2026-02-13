@@ -92,7 +92,8 @@ end
 % Reset controller compensation buffers for clean verification test
 % FIX 2026-01-19: Buffer size = T0_controller/dt + 1 for correct temporal alignment
 if T0_controller ~= 0
-    buffer_size_controller = round(T0_controller/dt) + 1;
+    % buffer_size_controller = round(T0_controller/dt) + 1;
+    buffer_size_controller = round(T0_controller/dt);
     bufor_state = zeros(1, buffer_size_controller);
     bufor_wyb_akcja = zeros(1, buffer_size_controller);
     bufor_uczenie = zeros(1, buffer_size_controller);

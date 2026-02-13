@@ -213,7 +213,8 @@ end
 % FIX 2026-01-19: Buffer size = T0_controller/dt + 1 for correct temporal alignment
 % Rationale: y[k] reflects u[k-11] (not u[k-10]) due to plant update timing
 if T0_controller ~= 0
-    buffer_size_controller = round(T0_controller/dt) + 1;
+    % buffer_size_controller = round(T0_controller/dt) + 1;
+    buffer_size_controller = round(T0_controller/dt);
     bufor_state = zeros(1, buffer_size_controller);
     bufor_wyb_akcja = zeros(1, buffer_size_controller);
     bufor_uczenie = zeros(1, buffer_size_controller);

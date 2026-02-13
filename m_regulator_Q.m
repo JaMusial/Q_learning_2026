@@ -145,13 +145,15 @@ else
                 m_losowanie_nowe
             end
 
-            % FIXED 2025-01-23: Don't update Q-values if exploration failed
-            % If constraint rejected random actions 10 times, fallback to exploitation
-            % but don't treat it as successful exploration for learning
             if ponowne_losowanie >= max_powtorzen_losowania_RD
                 [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
                 uczenie = 0;        % Don't update Q-values (failed exploration = exploitation)
                 czy_losowanie = 0;  % Mark as exploitation for logging
+                if a>=1-eps
+                    uczenie = 1;
+                else
+                    uczenie = 0;
+                end
             else
                 uczenie = 1;        % Successful exploration - update Q-values
                 czy_losowanie = 1;  % Mark as exploration for logging
@@ -165,76 +167,33 @@ else
             wart_akcji = akcje_sr(wyb_akcja);
             uczenie = 0;
             czy_losowanie = 0;
+            if a>=1-eps
+                uczenie = 1;
+            else
+                uczenie = 0;
+            end
         end
     end
 
     %% ========================================================================
     %% Delayed credit assignment (buffer state-action pairs)
     %% ========================================================================
-    % Buffer the correctly matched (stan, wyb_akcja) pair
-    %
-    % NOTE 2026-01-15: For projection mode with T0>0, we DISABLE Q-learning
-    % when projection significantly contributes to control. This avoids credit
-    % assignment mismatch where Q-learning would credit Q-actions for outcomes
-    % that were actually caused by the projection function.
-    %
-    % The problem: If we buffer raw action, Q learns wrong values (projection did the work)
-    %              If we buffer effective action, it maps to action 50 (do nothing)
-    % Solution: Don't update Q when projection dominates control
 
     if T0_controller > 0
-        % FIX 2026-01-15: For projection mode with T0>0, limit learning to near-setpoint.
-        %
-        % Problem: Control = Q_action - projection. With T0>0, we cannot correctly
-        % attribute the outcome to Q vs projection. Any approach to partial credit
-        % fails because Q-action and -projection always have opposite signs for
-        % identity Q-matrix, disabling almost all learning.
-        %
-        % Practical solution: Only update Q in the "fine control" region near setpoint
-        % where projection contribution is small (|e| < threshold).
-        % NOTE 2026-01-16: Removed Bug #11 error threshold restriction.
-        % The error threshold (|e| > 2%) disabled learning during transients but
-        % didn't fix credit assignment (ratio Te/Ti is constant regardless of error).
-        % New approach: projection is disabled near goal state and sign-protected
-        % to allow learning during transients while maintaining correct behavior.
 
         % Buffer current state, RAW action
-        [old_stan_T0, bufor_state] = f_bufor(stan, bufor_state);
-        [wyb_akcja_T0, bufor_wyb_akcja] = f_bufor(wyb_akcja, bufor_wyb_akcja);
-        [uczenie_T0, bufor_uczenie] = f_bufor(uczenie, bufor_uczenie);
+        %edit stan->old_stante, to samo z akcja
+        [old_stan_T0, bufor_state] = f_bufor(old_state, bufor_state);
+        [wyb_akcja_T0, bufor_wyb_akcja] = f_bufor(old_wyb_akcja, bufor_wyb_akcja);
+        [uczenie_T0, bufor_uczenie] = f_bufor(old_uczenie, bufor_uczenie);
         [e_T0, bufor_e] = f_bufor(e, bufor_e);
 
         % Use CURRENT state as next state (effect is visible now)
         stan_T0 = stan;
 
-        % CRITICAL FIX 2025-01-23 (Bug #6): Bootstrap override to prevent drift contamination
-        % Problem: When goal state + goal action selected, next state SHOULD be goal (by design)
-        % But numerical drift over T0_controller/dt iterations causes next state to be 49 or 51
-        % This contaminates bootstrap with lower Q-values, pulling Q(50,50) DOWN instead of UP
-        % Solution: Override next state to goal for bootstrap calculation when goal→goal intended
-        if old_stan_T0 == nr_stanu_doc && wyb_akcja_T0 == nr_akcji_doc
-            stan_T0_for_bootstrap = nr_stanu_doc;  % Override: goal action should keep at goal
-        else
-            stan_T0_for_bootstrap = stan_T0;  % Use actual next state
-        end
-
-        % Reward logic for goal-reaching with disturbances and dead time:
-        % We need to ensure Q(goal_state, goal_action) remains the highest value!
-        % Two cases for R=1:
-        % 1. Arriving at goal state (stan_T0 == goal) - rewards transitions TO goal
-        % 2. Being in goal WITH goal action (old_stan_T0 == goal AND wyb_akcja_T0 == goal_action)
-        %    - ensures Q(goal,goal_action) stays maximum even with disturbances
-        if stan_T0 == nr_stanu_doc || (old_stan_T0 == nr_stanu_doc && wyb_akcja_T0 == nr_akcji_doc)
-            R_buffered = 1;
-        else
-            R_buffered = 0;
-        end
     else
-        % No dead time compensation: standard one-step Q-learning
-        % CRITICAL FIX 2025-01-23: Pair old_state with old_wyb_akcja AND old_R (from same iteration)
-        % to maintain correct Q-learning semantics: Q(s_k-1, a_k-1) updated with R_k-1 using s_k
+
         stan_T0 = stan;
-        stan_T0_for_bootstrap = stan_T0;  % No override needed for T0=0 (minimal drift)
         old_stan_T0 = old_state;
         wyb_akcja_T0 = old_wyb_akcja;  % Action from SAME iteration as old_state
         uczenie_T0 = old_uczenie;      % Learning flag from SAME iteration as old_state
@@ -245,29 +204,22 @@ else
     stan_value_ref = de_ref + 1/Te * e_ref;
     stan_nr_ref = f_find_state(stan_value_ref, stany);
 
-    % CRITICAL FIX 2025-01-23 (Bug #6): Use stan_T0_for_bootstrap (not stan_T0) for max calculation
-    % This prevents bootstrap contamination when goal state drifts to adjacent states
-    maxS = max(Q_2d(stan_T0_for_bootstrap, :));
+
+    maxS = max(Q_2d(stan_T0, :));
     maxS_ref = max(Q_2d(stan_nr_ref, :));
+    %edit
+    if old_stan_T0==nr_stanu_doc && wyb_akcja_T0==nr_akcji_doc
+        old_R=1;
+    else
+        old_R=0;
+    end
 
     %% ========================================================================
     %% Q-learning update
-    %% ========================================================================
-    % FIX 2026-01-19: For projection mode with T0>0, disable learning when buffered error was large
-    % Rationale: Large projection dominates control, creating credit assignment mismatch.
-    % Q(s,a_raw) would be credited for outcome caused by (a_raw - large_projection).
-    % Solution: Use temporally-correct e_T0 (buffered error) to check if learning should occur.
-    if f_rzutujaca_on == 1 && T0_controller > 0
-        large_error_threshold = dokladnosc_gen_stanu * 2;
-        large_error_T0 = abs(e_T0) > large_error_threshold;
-        large_error_T0=false;
-    else
-        large_error_T0 = false;  % Always allow learning when projection off or T0=0
-    end
 
     % Update Q-value for the BUFFERED state-action pair
-    if uczenie_T0 == 1 && ~large_error_T0 && pozwolenie_na_uczenia == 1 && stan_T0_for_bootstrap ~= 0 && old_stan_T0 ~= 0
-        Q_update = alfa * (R_buffered + gamma * maxS - Q_2d(old_stan_T0, wyb_akcja_T0));
+    if uczenie_T0 == 1 && pozwolenie_na_uczenia == 1
+        Q_update = alfa * (old_R + gamma * maxS - Q_2d(old_stan_T0, wyb_akcja_T0));
         Q_2d(old_stan_T0, wyb_akcja_T0) = Q_2d(old_stan_T0, wyb_akcja_T0) + Q_update;
     end
 end
@@ -280,57 +232,10 @@ end
 
 wart_akcji_bez_f_rzutujacej = wart_akcji;
 
-% Apply projection function if enabled
-% NOTE 2025-12-01: Projection ALWAYS uses CURRENT error/state (not buffered)
-% Rationale: Projection modifies the control signal applied to plant RIGHT NOW
-%
-% FIX 2026-01-18: Conditional sign protection based on error magnitude.
-%
-% Key changes:
-% 1. Turn off if error is very small - already at setpoint, no projection needed
-% 2. For LARGE errors (transients): Allow projection to flip sign
-%    - This is ESSENTIAL for bumpless transfer during setpoint changes
-%    - Projection translates Te→Ti control, which often requires sign flip
-%    - Example: State 49 gives action=+0.2, projection=-4.2 → final=-4.0 (matches PI)
-% 3. For SMALL errors (steady state): Apply sign protection
-%    - Prevents instability near setpoint where sign flips can cause oscillation
-%
-% Uses continuous state_value to avoid quantization errors (Bug #12 fix).
 if f_rzutujaca_on == 1
     % Calculate projection value
     funkcja_rzutujaca = (e * (1/Te - 1/Ti));
-
-    % Threshold: errors larger than 2x precision are "large" (transient)
-    % e.g., dokladnosc_gen_stanu=0.5 → large_error > 1%
-    large_error_threshold = dokladnosc_gen_stanu * 2;
-    large_error = abs(e) > large_error_threshold;
-
-    % Turn off projection if error is very small (already at setpoint)
-    very_small_error = abs(e) <= dokladnosc_gen_stanu;
-
-    if very_small_error && 0
-        % Already at setpoint: don't apply projection
-        % Keep wart_akcji unchanged (preserves Q-table's learned action)
-        funkcja_rzutujaca = 0;
-    elseif large_error
-        % Large error (transient): Apply projection WITHOUT sign protection
-        % This allows proper Te→Ti translation for bumpless transfer
-        wart_akcji = wart_akcji - funkcja_rzutujaca;
-    else
-        % Small error (near steady state): Apply projection WITH sign protection
-        wart_akcji_po_proj = wart_akcji - funkcja_rzutujaca;
-
-        % Sign protection: don't let projection flip control direction
-        if wart_akcji ~= 0 && sign(wart_akcji_po_proj) ~= sign(wart_akcji)
-            % Projection would flip sign - disable it to prevent instability
-            funkcja_rzutujaca = 0;
-            wart_akcji = wart_akcji - funkcja_rzutujaca;
-        else
-            wart_akcji = wart_akcji_po_proj;
-        end
-    end
-else
-    funkcja_rzutujaca = 0;
+    wart_akcji = wart_akcji - funkcja_rzutujaca;
 end
 
 % Calculate control signal
