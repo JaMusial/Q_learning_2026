@@ -1,7 +1,7 @@
 clear all
 close all
 clc
-rng(3)
+% rng(5)
 
 %to do, brak rysowania przy poj iteracji uczenia
 
@@ -148,6 +148,7 @@ if poj_iteracja_uczenia == 0
     mesh(Q_2d)
 end
 
+if 0
 nazwa_zapisanie=['T0 ',num2str(T0),' T0controller ',num2str(T0_controller),' epoki ',num2str(max_epoki)];
 if ~exist('Saved_data','dir')
     mkdir('Saved_data');
@@ -158,3 +159,4 @@ if exist(fname,'file')
 end
 save(fname);
 fprintf('Workspace saved to %s\n', fname);
+end

@@ -25,7 +25,7 @@
 %% =====================================================================
 
 % Path to saved workspace .mat file
-mat_file_path = fullfile('Saved_data', 'T0 2 T0controller 1.6 epoki 3000.mat');
+mat_file_path = fullfile('Saved_data', 'T0 4 T0controller 4 epoki 3000.mat');
 
 % Normalization factor: divide process units [0, 100]% by this to get [0, 1]
 NORM_FACTOR = 100;

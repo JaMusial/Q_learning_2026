@@ -9,7 +9,7 @@
 
 %% --- Simulation Control ---
 poj_iteracja_uczenia = 0;          % 1=single iteration mode, 0=full verification with metrics
-max_epoki = 2400;                    % Training duration (500 for testing, 5000+ for full training)
+max_epoki = 3000;                    % Training duration (500 for testing, 5000+ for full training)
 maksymalna_ilosc_iteracji_uczenia = 4000;  % Max samples per epoch
 czas_eksp_wer = 600;               % Verification experiment time [s]
 gif_on = 0;                        % 1=generate GIF animation, 0=disabled
@@ -60,9 +60,9 @@ k = 1;                             % Process gain
 % T = [2.34 1.55 9.38];              % Time constants [s] - adjust dimensions per model
 % T=[5 2];
 T = [5];
-T0 = 4;                            % Plant dead time (physical reality) [s]
-T0_controller = T0;                % Controller compensation dead time [s] (0=no compensation)
-% T0_controller = T0-0.2*T0;         % UnderCompensation
+T0 = 2;                            % Plant dead time (physical reality) [s]
+% T0_controller = T0;                % Controller compensation dead time [s] (0=no compensation)
+T0_controller = T0+0.2*T0;         % UnderCompensation
 % T0_controller = T0+0.5*T0;         % OverCompensation
 
 SP_ini = 50;                       % Initial setpoint [%]
@@ -82,7 +82,7 @@ kQ = Kp;                           % Q-controller gain (set to Kp for bumpless t
 % Learning parameters
 alfa = 0.1;                        % Learning rate (0 < alfa <= 1)
 gamma = 0.99;                      % Discount factor (0 < gamma < 1)
-eps_ini = 0.1;                     % Initial exploration rate [0, 1]
+eps_ini = 0.09;                     % Initial exploration rate [0, 1]
 nagroda = 1;                       % Reward value (typically 1)
 
 % State space generation

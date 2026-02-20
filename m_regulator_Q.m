@@ -149,7 +149,7 @@ else
                 [Q_value, wyb_akcja] = f_best_action_in_state(Q_2d, stan, nr_akcji_doc);
                 uczenie = 0;        % Don't update Q-values (failed exploration = exploitation)
                 czy_losowanie = 0;  % Mark as exploitation for logging
-                if a>=1-eps
+                if a>=1-eps && 0
                     uczenie = 1;
                 else
                     uczenie = 0;
@@ -167,7 +167,7 @@ else
             wart_akcji = akcje_sr(wyb_akcja);
             uczenie = 0;
             czy_losowanie = 0;
-            if a>=1-eps
+            if a>=1-eps && 0
                 uczenie = 1;
             else
                 uczenie = 0;
