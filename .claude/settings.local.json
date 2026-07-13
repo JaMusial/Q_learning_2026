@@ -25,7 +25,9 @@
       "Bash(git cat-file -t 98d11070f65dab70c6520c4b4d18ad34ce450281)",
       "Bash(git rev-parse HEAD^{tree})",
       "Bash(python:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(cat .gitignore)",
+      "Bash(wc -l temp.m temptemp.m temptemptemp.m)"
     ],
     "deny": [],
     "ask": []

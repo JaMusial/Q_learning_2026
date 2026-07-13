@@ -236,6 +236,8 @@ if f_rzutujaca_on == 1
     % Calculate projection value
     funkcja_rzutujaca = (e * (1/Te - 1/Ti));
     wart_akcji = wart_akcji - funkcja_rzutujaca;
+else
+    funkcja_rzutujaca=0;
 end
 
 % Calculate control signal

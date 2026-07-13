@@ -55,14 +55,14 @@ long_run_interval = 1000;          % Reporting interval for long runs [epochs]
 %   7 - Second order oscillatory         T: [T1, T2, T3] (tested for T=[5 2 1])
 %   8 - Third order pneumatic            T: [T1, T2, T3] (example: T=[2.34 1.55 9.38])
 
-nr_modelu = 1;                     % Model selection (1, 3, 5, 6, 7, 8)
+nr_modelu = 6;                     % Model selection (1, 3, 5, 6, 7, 8)
 k = 1;                             % Process gain
-% T = [2.34 1.55 9.38];              % Time constants [s] - adjust dimensions per model
+T = [2.34 1.55 9.38];              % Time constants [s] - adjust dimensions per model
 % T=[5 2];
-T = [5];
-T0 = 2;                            % Plant dead time (physical reality) [s]
-% T0_controller = T0;                % Controller compensation dead time [s] (0=no compensation)
-T0_controller = T0+0.2*T0;         % UnderCompensation
+% T = [5];
+T0 = 0;                            % Plant dead time (physical reality) [s]
+T0_controller = T0;                % Controller compensation dead time [s] (0=no compensation)
+% T0_controller = T0+0.2*T0;         % UnderCompensation
 % T0_controller = T0+0.5*T0;         % OverCompensation
 
 SP_ini = 50;                       % Initial setpoint [%]
@@ -88,7 +88,7 @@ nagroda = 1;                       % Reward value (typically 1)
 % State space generation
 dokladnosc_gen_stanu = 0.5;        % Precision (steady-state accuracy)
 oczekiwana_ilosc_stanow = 100;     % Expected number of states
-f_rzutujaca_on = 1;                % Projection function mode:
+f_rzutujaca_on = 0;                % Projection function mode:
                                    %   0 = DISABLED (current approach, recommended)
                                    %       - Te starts at Ti (bumpless switching)
                                    %       - Staged learning enabled (Te: 20→2 in 0.1s steps)
@@ -142,3 +142,4 @@ wart_max_u = 2;      wart_min_u = 0;     % Normalized control
 %% --- Manual Control ---
 ilosc_probek_sterowanie_reczne = 5;  % Manual control samples at start (u=SP/k)
 dodatkowe_probki_reka = 5;           % Additional manual samples for buffer pre-filling
+

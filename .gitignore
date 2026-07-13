@@ -21,6 +21,9 @@ profiler_test.m
 # OS files
 .DS_Store
 Thumbs.db
+
+# Word/Excel lock files
+~$*
 # Log files
 *.json
 /Ucznir T5T04TC0

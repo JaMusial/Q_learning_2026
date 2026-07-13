@@ -45,7 +45,7 @@ delta_u_Q_data = zeros(2, 3, 3);
 overshoot_Q_data = zeros(2, 3, 3);
 
 % Storage for PI baseline: (scenario, T0_index)
-% PI only for Full compensation (T0_controller = T0)
+% PI only for Accurate estimation (T0_controller = T0)
 IAE_PI_data = zeros(2, 3);
 delta_u_PI_data = zeros(2, 3);
 overshoot_PI_data = zeros(2, 3);
@@ -122,7 +122,7 @@ for aa = 1:numel(T0_wek)
         overshoot_Q_data(1, aa, comp_idx) = overshoot_Q(1);
         overshoot_Q_data(2, aa, comp_idx) = overshoot_Q(2);
 
-        % For Full compensation only, also compute and store PI metrics
+        % For Accurate estimation only, also compute and store PI metrics
         if comp_idx == 1
             [IAE_PI, ~, overshoot_PI, ~, delta_u_PI] = ...
                 f_licz_wskazniki(ws.logi.PID_y, ws.logi.PID_u, ws.SP_ini, ...
@@ -191,9 +191,9 @@ for aa = 1:numel(T0_wek)
 
     grid on
     set(gca, 'Color', 'w', 'FontSize', 20)
-    xlabel('time [s]', 'FontSize', 20)
+    xlabel('time ', 'FontSize', 20)
     ylabel('Y', 'FontSize', 20)
-    legend('PI = QwL','QaL full compensation', 'QaL under compensation', 'QaL over compensation', ...
+    legend('Initialization','Accurate estimation', 'Underestimation', 'Overestimation', ...
         'Location', 'best', 'FontSize', 20, 'Position', [0.587965433632459,0.149053745281145,0.29442747205071,0.216968011126564])
 
     if T0==4
@@ -205,7 +205,7 @@ for aa = 1:numel(T0_wek)
     end
 
     annotation('textarrow', [0.4207,0.5104], [0.5214,0.6929], ...
-        'String', sprintf('d = %.1f\nt = %d s', -0.3, 200), ...
+        'String', sprintf('d = %.1f\nt = %d', -0.3, 200), ...
         'FontSize', 20, 'Color', [0.3 0.3 0.3], 'TextColor', [0 0 0], ...
         'HeadWidth', 8, 'HeadLength', 6, 'HorizontalAlignment', 'center');
 
@@ -234,9 +234,9 @@ for aa = 1:numel(T0_wek)
 
     grid on
     set(gca, 'Color', 'w', 'FontSize', 20)
-    xlabel('time [s]', 'FontSize', 20)
+    xlabel('time', 'FontSize', 20)
     ylabel('U', 'FontSize', 20)
-    legend('PI = QwL', 'QaL full compensation', 'QaL under compensation', 'QaL over compensation', ...
+    legend('Initialization', 'Accurate estimation', 'Underestimation', 'Overestimation', ...
         'Location', 'best', 'FontSize', 20, 'Position', [0.587965433632459,0.149053745281145,0.29442747205071,0.216968011126564])
 
     if T0==0.5
@@ -249,7 +249,7 @@ for aa = 1:numel(T0_wek)
 
 
     annotation('textarrow', [0.4221,0.4961], [0.6167,0.4762], ...
-        'String', sprintf('d = %.1f\nt = %d s', -0.3, 200), ...
+        'String', sprintf('d = %.1f\nt = %d', -0.3, 200), ...
         'FontSize', 20, 'Color', [0.3 0.3 0.3], 'TextColor', [0 0 0], ...
         'HeadWidth', 8, 'HeadLength', 6, 'HorizontalAlignment', 'center');
 
