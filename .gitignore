@@ -11,6 +11,7 @@ profiler_test.m
 # Output files
 *.mat
 !initial_data.mat
+*.xlsx
 
 # Figures
 *.fig
